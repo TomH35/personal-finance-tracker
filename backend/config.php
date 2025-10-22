@@ -4,8 +4,8 @@
 
     $host = 'localhost';
     $db   = 'finance_tracker_db';
-    $user = 'testuser';
-    $pass = 'mypassword';
+    $user = 'root';
+    $pass = '';
 
     try {
         $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
