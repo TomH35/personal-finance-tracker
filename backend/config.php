@@ -1,11 +1,14 @@
 <?php
-    header('Content-Type: application/json');
-    header('Access-Control-Allow-Origin: *');
+    require_once 'vendor/autoload.php';
+    use Dotenv\Dotenv;
+    
+    $dotenv = Dotenv::createImmutable(__DIR__);
+    $dotenv->load();
 
-    $host = 'localhost';
-    $db   = 'finance_tracker_db';
-    $user = 'root';
-    $pass = '';
+    $host = $_ENV['DB_HOST'];
+    $db   = $_ENV['DB_NAME'];
+    $user = $_ENV['DB_USER'];
+    $pass = $_ENV['DB_PASSWORD'];
 
     try {
         $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
