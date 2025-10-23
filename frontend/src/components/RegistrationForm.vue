@@ -2,18 +2,17 @@
   <div class="card shadow-sm">
     <div class="card-body p-4">
       <h5 class="text-center mb-4 fw-semibold text-primary">Create Your Account</h5>
-
       <form @submit.prevent="handleSubmit">
-        <!-- Full Name -->
+        <!-- Username -->
         <div class="mb-3">
-          <label class="form-label">Full Name</label>
+          <label class="form-label">Username</label>
           <div class="input-group">
             <span class="input-group-text bg-white" aria-hidden="true">👤</span>
             <input
-              v-model="formData.fullName"
+              v-model="formData.username"
               type="text"
               class="form-control"
-              placeholder="Enter your full name"
+              placeholder="Enter your username"
               required
             />
           </div>
@@ -78,7 +77,19 @@
             I agree to the <a href="#">Terms and Conditions</a>
           </label>
         </div>
+        <!-- Success Alert -->
+        <div
+          v-if="alertMessage && alertType === 'success'"
+          class="alert alert-success"
+          role="alert"
+        >
+          {{ alertMessage }}
+        </div>
 
+        <!-- Error Alert -->
+        <div v-if="alertMessage && alertType === 'error'" class="alert alert-danger" role="alert">
+          {{ alertMessage }}
+        </div>
         <button type="submit" class="btn btn-primary w-100">Register</button>
       </form>
 
@@ -95,8 +106,19 @@ import { ref, computed } from 'vue'
 
 const emit = defineEmits(['register'])
 
+const props = defineProps({
+  alertMessage: {
+    type: String,
+    default: '',
+  },
+  alertType: {
+    type: String,
+    default: '',
+  },
+})
+
 const formData = ref({
-  fullName: '',
+  username: '',
   email: '',
   password: '',
   confirmPassword: '',
@@ -117,7 +139,7 @@ const handleSubmit = () => {
   }
 
   emit('register', {
-    fullName: formData.value.fullName,
+    username: formData.value.username,
     email: formData.value.email,
     password: formData.value.password,
   })

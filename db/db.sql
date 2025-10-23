@@ -11,6 +11,7 @@ USE finance_tracker_db;
 CREATE TABLE users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,          -- User ID
     username VARCHAR(50) UNIQUE NOT NULL,            -- Username
+    email VARCHAR(255) NOT NULL,		     -- Email
     password_hash VARCHAR(255) NOT NULL,             -- Hashed password
     role ENUM('admin', 'user') DEFAULT 'user',       -- User role
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP    -- Creation time
