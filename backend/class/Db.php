@@ -26,5 +26,10 @@
         public function getPdo() {
             return $this->pdo;
         }
+
+        // Explicitly closes the database connection
+        public function closeConnection() {
+            $this->pdo = null;
+        }
     }
 ?>
