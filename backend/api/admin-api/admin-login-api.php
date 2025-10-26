@@ -23,11 +23,11 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     exit();
 }
 
-$email = $input['email'] ?? '';
+$identifier = $input['identifier'] ?? ''; // email or username
 $password = $input['password'] ?? '';
 
 $auth = new Auth();
-$result = $auth->loginUser($email, $password);
+$result = $auth->loginUser($identifier, $password);
 
 if ($result['success']) {
     http_response_code(200);

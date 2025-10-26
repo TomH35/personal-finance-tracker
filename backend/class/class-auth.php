@@ -96,27 +96,34 @@ class Auth {
         }
     }
 
-    public function loginUser($email, $password) {
+    /**
+     * Log in a user (admin only)
+     * 
+     * @param string $identifier The user's email or username
+     * @param string $password The plain text password
+     * @return array Response array with success status, message, and token if successful
+     */
+    public function loginUser($identifier, $password) {
         try {
             $pdo = $this->db->getPdo();
 
             // Validate input
-            if (empty($email) || empty($password)) {
+            if (empty($identifier) || empty($password)) {
                 return [
                     'success' => false,
-                    'message' => 'Email and password are required'
+                    'message' => 'Identifier and password are required'
                 ];
             }
 
-            // Find user by email
-            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email LIMIT 1");
-            $stmt->execute(['email' => $email]);
+            // Find user by email or username
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :identifier OR username = :identifier LIMIT 1");
+            $stmt->execute(['identifier' => $identifier]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$user) {
                 return [
                     'success' => false,
-                    'message' => 'Invalid email or password'
+                    'message' => 'Invalid identifier or password'
                 ];
             }
 
@@ -124,7 +131,7 @@ class Auth {
             if (!password_verify($password, $user['password_hash'])) {
                 return [
                     'success' => false,
-                    'message' => 'Invalid email or password'
+                    'message' => 'Invalid identifier or password'
                 ];
             }
 

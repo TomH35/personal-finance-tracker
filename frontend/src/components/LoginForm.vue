@@ -6,16 +6,16 @@
       </h5>
 
       <form @submit.prevent="handleSubmit">
-        <!-- Email -->
+        <!-- Identifier -->
         <div class="mb-3">
-          <label class="form-label">Email</label>
+          <label class="form-label">Email or Username</label>
           <div class="input-group">
             <span class="input-group-text bg-white" aria-hidden="true">👤</span>
             <input
-              v-model="formData.email"
-              type="email"
+              v-model="formData.identifier"
+              type="text"
               class="form-control"
-              placeholder="Enter your email"
+              placeholder="Enter your email or username"
               required
             />
           </div>
@@ -84,16 +84,16 @@ const props = defineProps({
 })
 
 const formData = ref({
-  email: '',      
+  identifier: '',      
   password: '',
   remember: false,
 })
 
 const handleSubmit = () => {
-  if (!formData.value.email || !formData.value.password) return;
+  if (!formData.value.identifier || !formData.value.password) return;
 
   emit('login', {
-    email: formData.value.email,   
+    identifier: formData.value.identifier,
     password: formData.value.password,
     remember: formData.value.remember,
   })
