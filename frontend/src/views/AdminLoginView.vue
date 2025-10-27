@@ -7,6 +7,7 @@
           :alert-message="alertMessage"
           :alert-type="alertType"
           form-title="Admin Login"
+          register-link="/admin-registration"
         />
       </div>
     </div>

@@ -57,7 +57,7 @@
 
       <p class="text-center mt-3 mb-0 small">
         Don't have an account?
-        <RouterLink to="/register" class="fw-semibold text-primary">Register here</RouterLink>
+        <RouterLink :to="registerLink" class="fw-semibold text-primary">Register here</RouterLink>
       </p>
     </div>
   </div>
@@ -81,6 +81,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  registerLink: {
+    type: String,
+    default: '/user-registration', // default for user
+  }
 })
 
 const formData = ref({
