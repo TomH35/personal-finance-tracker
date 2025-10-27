@@ -27,7 +27,7 @@ $identifier = $input['identifier'] ?? ''; // email or username
 $password = $input['password'] ?? '';
 
 $auth = new Auth();
-$result = $auth->loginUser($identifier, $password);
+$result = $auth->loginUser($identifier, $password, 'admin'); // hardcoded role admin
 
 if ($result['success']) {
     http_response_code(200);

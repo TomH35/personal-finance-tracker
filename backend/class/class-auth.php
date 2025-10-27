@@ -97,13 +97,14 @@ class Auth {
     }
 
     /**
-     * Log in a user (admin only)
+     * Log in a user
      * 
      * @param string $identifier The user's email or username
      * @param string $password The plain text password
+     * @param string $expectedRole The expected role ('admin' or 'user')
      * @return array Response array with success status, message, and token if successful
      */
-    public function loginUser($identifier, $password) {
+    public function loginUser($identifier, $password, $expectedRole = 'user') {
         try {
             $pdo = $this->db->getPdo();
 
@@ -135,11 +136,11 @@ class Auth {
                 ];
             }
 
-            // Check if user is admin
-            if ($user['role'] !== 'admin') {
+            // Check user role matches expected role
+            if ($user['role'] !== $expectedRole) {
                 return [
                     'success' => false,
-                    'message' => 'Access denied. Admin only.'
+                    'message' => 'Access denied. Only ' . ucfirst($expectedRole) . 's are allowed.'
                 ];
             }
 
