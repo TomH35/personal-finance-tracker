@@ -25,7 +25,7 @@ const handleRegistration = async (userData) => {
   alertMessage.value = ''
   alertType.value = ''
   try {
-    const response = await fetch('/backend/api/user-api/user-registration-api.php', {
+    const response = await fetch('/backend/api/auth-api/user-registration-api.php', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
