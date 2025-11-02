@@ -18,10 +18,12 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import LoginForm from '@/components/LoginForm.vue'
+import { useLoginStore } from '@/stores/loginStore'
 
 const alertMessage = ref('')
 const alertType = ref('')
 const router = useRouter()
+const loginStore = useLoginStore() 
 
 const handleLogin = async (loginData) => {
   alertMessage.value = ''
@@ -44,7 +46,7 @@ const handleLogin = async (loginData) => {
       alertType.value = 'success'
 
       if (data.token) {
-        localStorage.setItem('userToken', data.token)
+        loginStore.setJwt(data.token) // Save token to store and localStorage
       }
 
       setTimeout(() => router.push({ name: 'home' }), 2000)
@@ -59,4 +61,3 @@ const handleLogin = async (loginData) => {
   }
 }
 </script>
-
