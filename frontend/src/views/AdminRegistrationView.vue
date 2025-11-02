@@ -27,7 +27,7 @@ const handleRegistration = async (adminData) => {
   alertMessage.value = ''
   alertType.value = ''
   try {
-    const response = await fetch('/backend/api/admin-api/admin-registration-api.php', {
+    const response = await fetch('/backend/api/auth-api/admin-registration-api.php', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
