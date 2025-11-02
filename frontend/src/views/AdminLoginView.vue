@@ -28,7 +28,7 @@ const handleLogin = async (loginData) => {
   alertType.value = ''
 
   try {
-    const response = await fetch('/backend/api/admin-api/admin-login-api.php', {
+    const response = await fetch('/backend/api/auth-api/admin-login-api.php', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
