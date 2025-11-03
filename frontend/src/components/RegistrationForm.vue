@@ -95,7 +95,7 @@
 
       <p class="text-center mt-3 mb-0">
         Already have an account?
-        <RouterLink to="/login">Login here</RouterLink>
+        <RouterLink :to="loginLink" class="fw-semibold text-primary">Login here</RouterLink>
       </p>
     </div>
   </div>
@@ -115,6 +115,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  loginLink: {
+    type: String,
+    default: '/login', // default for user
+  }
 })
 
 const formData = ref({

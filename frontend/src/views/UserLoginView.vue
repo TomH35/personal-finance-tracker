@@ -49,7 +49,7 @@ const handleLogin = async (loginData) => {
         loginStore.setJwt(data.token) // Save token to store and localStorage
       }
 
-      setTimeout(() => router.push({ name: 'home' }), 2000)
+      setTimeout(() => router.push('/user-dashboard'), 2000)
     } else {
       alertMessage.value = data.message || 'Invalid credentials. Please try again.'
       alertType.value = 'error'

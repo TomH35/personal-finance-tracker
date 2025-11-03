@@ -7,6 +7,7 @@
           :alert-message="alertMessage"
           :alert-type="alertType"
           form-title="Admin Registration"
+          login-link="/admin-login"
         />
       </div>
     </div>
@@ -40,7 +41,7 @@ const handleRegistration = async (adminData) => {
       console.log('Admin registration successful:', data)
       alertMessage.value = 'Admin registration successful!'
       alertType.value = 'success'
-      setTimeout(() => router.push('/login'), 2000)
+      setTimeout(() => router.push('/admin-login'), 2000)
     } else {
       console.error('Admin registration failed:', data)
       alertMessage.value = data.message || 'Registration failed. Please try again.'
