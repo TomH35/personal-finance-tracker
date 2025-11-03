@@ -194,5 +194,107 @@ class Auth {
             ];
         }
     }
+
+    /**
+     * Check if a user is an admin based on JWT token
+     * 
+     * @param string $jwt The JWT token to verify
+     * @return bool True if user is admin, false otherwise
+     */
+    public function isAdmin($jwt) {
+        try {
+            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+            $dotenv->load();
+            $jwtSecret = $_ENV['JWT_SECRET'];
+
+            $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+
+            if (!isset($decoded->data->user_id)) {
+                return false;
+            }
+
+            $userId = $decoded->data->user_id;
+
+            $pdo = $this->db->getPdo();
+            $stmt = $pdo->prepare("SELECT role FROM users WHERE user_id = :user_id LIMIT 1");
+            $stmt->execute(['user_id' => $userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && $user['role'] === 'admin') {
+                return true;
+            }
+
+            return false;
+
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            error_log("JWT expired: " . $e->getMessage());
+            return false;
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            error_log("JWT signature invalid: " . $e->getMessage());
+            return false;
+        } catch (\Firebase\JWT\BeforeValidException $e) {
+            error_log("JWT not yet valid: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            error_log("JWT verification error: " . $e->getMessage());
+            return false;
+        } catch (PDOException $e) {
+            error_log("Database error in isAdmin: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get user ID from JWT token
+     * Validates and decodes the JWT, verifies the user exists in the database,
+     * and returns the user ID
+     * 
+     * @param string $jwt The JWT token to verify
+     * @return int|null The user ID if valid and user exists, null otherwise
+     */
+    public function getUserId($jwt) {
+        try {
+            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+            $dotenv->load();
+            $jwtSecret = $_ENV['JWT_SECRET'];
+
+            $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+
+            if (!isset($decoded->data->user_id)) {
+                error_log("JWT does not contain user_id");
+                return null;
+            }
+
+            $userId = $decoded->data->user_id;
+
+            $pdo = $this->db->getPdo();
+            $stmt = $pdo->prepare("SELECT user_id FROM users WHERE user_id = :user_id LIMIT 1");
+            $stmt->execute(['user_id' => $userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                error_log("User with ID $userId does not exist in database");
+                return null;
+            }
+
+            return (int)$user['user_id'];
+
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            error_log("JWT expired: " . $e->getMessage());
+            return null;
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            error_log("JWT signature invalid: " . $e->getMessage());
+            return null;
+        } catch (\Firebase\JWT\BeforeValidException $e) {
+            error_log("JWT not yet valid: " . $e->getMessage());
+            return null;
+        } catch (Exception $e) {
+            error_log("JWT verification error: " . $e->getMessage());
+            return null;
+        } catch (PDOException $e) {
+            error_log("Database error in getUserId: " . $e->getMessage());
+            return null;
+        }
+    }
 }
 ?>
