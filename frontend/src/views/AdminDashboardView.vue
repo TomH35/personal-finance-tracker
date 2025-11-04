@@ -1,215 +1,302 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, nextTick } from 'vue'
+import { useLoginStore } from '@/stores/loginStore'
 
-const users = ref([]);
-const error = ref('');
+const loginStore = useLoginStore()
+const jwt = loginStore.jwt
 
+// Users
+const users = ref([])
+const userError = ref('')
+
+// Categories
+const categories = ref([])
+const newCategory = ref('')
+const newCategoryType = ref('expense')
+const selectedCategory = ref({ name: '', type: 'expense' })
+const categoryError = ref('')
+
+// Fetch users and categories
 onMounted(async () => {
   try {
     const response = await fetch('/backend/api/user-api/user-get-all-api.php', {
       method: 'GET',
-      credentials: 'include' // Important: sends session cookie
-    });
-
-    const data = await response.json();
-
-    if (data.success) {
-      users.value = data.users;
-    } else {
-      error.value = data.message || 'Failed to fetch users';
-    }
-
+      headers: { 'auth': `Bearer ${jwt}` }
+    })
+    const data = await response.json()
+    if (data.success) users.value = data.users
+    else userError.value = data.message
   } catch (err) {
-    error.value = 'Network error: ' + err.message;
+    userError.value = 'Network error: ' + err.message
   }
-});
 
-// Delete a user
+  getCategories()
+})
+
+// User actions
 const deleteUser = async (user_id) => {
-  if (!confirm('Are you sure you want to delete this user?')) return;
-
+  if (!confirm('Are you sure you want to delete this user?')) return
   try {
     const res = await fetch('/backend/api/user-api/user-delete-api.php', {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
       body: JSON.stringify({ user_id })
-    });
-    const data = await res.json();
-    if (data.success) {
-      users.value = users.value.filter(u => u.user_id !== user_id);
-      alert('User deleted successfully');
-    } else {
-      alert(data.message || 'Failed to delete user');
-    }
+    })
+    const data = await res.json()
+    if (data.success) users.value = users.value.filter(u => u.user_id !== user_id)
+    else alert(data.message)
   } catch (err) {
-    alert('Network error: ' + err.message);
+    alert('Network error: ' + err.message)
   }
-};
+}
 
-// Edit a user
 const editUser = async (user) => {
-  const newUsername = prompt('Enter new username', user.username);
-  if (!newUsername) return;
-
-  const newEmail = prompt('Enter new email', user.email);
-  if (!newEmail) return;
-
-  const newRole = prompt('Enter role (admin/user)', user.role);
-  if (!['admin', 'user'].includes(newRole)) {
-    alert('Invalid role');
-    return;
-  }
+  const newUsername = prompt('Enter new username', user.username)
+  if (!newUsername) return
+  const newEmail = prompt('Enter new email', user.email)
+  if (!newEmail) return
+  const newRole = prompt('Enter role (admin/user)', user.role)
+  if (!['admin', 'user'].includes(newRole)) return alert('Invalid role')
 
   try {
     const res = await fetch('/backend/api/user-api/user-edit-api.php', {
       method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: user.user_id,
-        username: newUsername,
-        email: newEmail,
-        role: newRole
-      })
-    });
-    const data = await res.json();
+      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
+      body: JSON.stringify({ user_id: user.user_id, username: newUsername, email: newEmail, role: newRole })
+    })
+    const data = await res.json()
     if (data.success) {
-      // Update local users array
-      const index = users.value.findIndex(u => u.user_id === user.user_id);
-      if (index !== -1) {
-        users.value[index] = { ...users.value[index], username: newUsername, email: newEmail, role: newRole };
-      }
-      alert('User updated successfully');
-    } else {
-      alert(data.message || 'Failed to update user');
-    }
+      const index = users.value.findIndex(u => u.user_id === user.user_id)
+      if (index !== -1) users.value[index] = { ...users.value[index], username: newUsername, email: newEmail, role: newRole }
+    } else alert(data.message)
   } catch (err) {
-    alert('Network error: ' + err.message);
+    alert('Network error: ' + err.message)
   }
-};
+}
+
+// Category actions
+const getCategories = async () => {
+  try {
+    const res = await fetch('/backend/api/category-api/category-get-all-api.php', {
+      method: 'GET',
+      headers: { 'auth': `Bearer ${jwt}` }
+    })
+    const data = await res.json()
+    if (data.success) categories.value = data.categories
+    else categoryError.value = data.message
+  } catch (err) {
+    categoryError.value = 'Network error: ' + err.message
+  }
+}
+
+const addCategory = async () => {
+  if (!newCategory.value) return
+
+  const name = newCategory.value.trim().toLowerCase()
+  const duplicate = categories.value.some(c => c.name.toLowerCase() === name)
+  if (duplicate) {
+    alert('Category name already exists')
+    return
+  }
+
+  try {
+    const res = await fetch('/backend/api/category-api/category-create-api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
+      body: JSON.stringify({ name: newCategory.value.trim(), type: newCategoryType.value })
+    })
+    const data = await res.json()
+    if (data.success) {
+      categories.value.push(data.category)
+      newCategory.value = ''
+      newCategoryType.value = 'expense'
+    } else alert(data.message)
+  } catch (err) {
+    alert('Network error: ' + err.message)
+  }
+}
+
+const openEditCategoryModal = async (category) => {
+  selectedCategory.value = { ...category }
+  await nextTick() 
+  const modalEl = document.getElementById('editCategoryModal')
+  const modal = new bootstrap.Modal(modalEl)
+  modal.show()
+}
+
+const updateCategory = async () => {
+  const name = selectedCategory.value.name.trim().toLowerCase()
+  const duplicate = categories.value.some(
+    c => c.name.toLowerCase() === name && c.id !== selectedCategory.value.id
+  )
+  if (duplicate) {
+    alert('Category name already exists')
+    return
+  }
+
+  try {
+    const res = await fetch('/backend/api/category-api/category-edit-api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
+      body: JSON.stringify(selectedCategory.value)
+    })
+    const data = await res.json()
+    if (data.success) {
+      const index = categories.value.findIndex(c => c.id === selectedCategory.value.id)
+      if (index !== -1) categories.value[index] = { ...selectedCategory.value }
+
+      await nextTick()
+      const modalEl = document.getElementById('editCategoryModal')
+      const modal = bootstrap.Modal.getInstance(modalEl)
+      modal.hide()
+    } else alert(data.message)
+  } catch (err) {
+    alert('Network error: ' + err.message)
+  }
+}
+
+const deleteCategory = async (id) => {
+  if (!confirm('Are you sure you want to delete this category?')) return
+  try {
+    const res = await fetch('/backend/api/category-api/category-delete-api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
+      body: JSON.stringify({ id })
+    })
+    const data = await res.json()
+    if (data.success) categories.value = categories.value.filter(c => c.id !== id)
+    else alert(data.message)
+  } catch (err) {
+    alert('Network error: ' + err.message)
+  }
+}
 </script>
 
 <template>
-  <div class="container-fluid">
-    <div class="row">
+<div class="container-fluid">
+  <div class="row">
 
-      <!-- Sidebar -->
-      <nav class="col-md-3 col-lg-2 d-md-block bg-white border-end min-vh-100 p-3">
-        <h5 class="text-primary mb-4">Dashboard</h5>
-        <div class="nav flex-column nav-pills" id="adminTab" role="tablist" aria-orientation="vertical">
-          <button class="nav-link active mb-2 text-start" id="users-tab" data-bs-toggle="tab" data-bs-target="#users"
-            type="button" role="tab">
-            👥 Users
-          </button>
-          <button class="nav-link mb-2 text-start" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories"
-            type="button" role="tab">
-            🗂️ Categories
-          </button>
-        </div>
-      </nav>
+    <!-- Sidebar -->
+    <nav class="col-md-3 col-lg-2 d-md-block bg-white border-end min-vh-100 p-3">
+      <h5 class="text-primary mb-4">Dashboard</h5>
+      <div class="nav flex-column nav-pills" id="adminTab" role="tablist" aria-orientation="vertical">
+        <button class="nav-link active mb-2 text-start" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">👥 Users</button>
+        <button class="nav-link mb-2 text-start" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories" type="button" role="tab">🗂️ Categories</button>
+      </div>
+    </nav>
 
-      <!-- Main content -->
-      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-        <h2 class="fw-semibold mb-4">Admin Panel</h2>
+    <!-- Main content -->
+    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+      <h2 class="fw-semibold mb-4">Admin Panel</h2>
 
-        <div class="tab-content" id="adminTabContent">
+      <div class="tab-content" id="adminTabContent">
 
-          <!-- USERS -->
-          <div class="tab-pane fade show active" id="users" role="tabpanel">
-            <div class="card shadow-sm border-0">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h5 class="card-title mb-0">Users List</h5>
-                  <button class="btn btn-sm btn-primary">+ Add User</button>
-                </div>
-                <div class="table-responsive">
-                  <table class="table align-middle table-hover">
-                    <thead class="table-primary">
-                      <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th class="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="user in users" :key="user.user_id">
-                        <td>{{ user.user_id }}</td>
-                        <td>{{ user.username }}</td>
-                        <td>{{ user.email }}</td>
-
-                        <td v-if="user.role == 'admin'"><span class="badge bg-success">Admin</span></td>
-                        <td v-else><span class="badge bg-secondary">User</span></td>
-
-                        <td class="text-end">
-                          <button class="btn btn-sm btn-outline-warning me-1" @click="editUser(user)">Edit</button>
-                          <button class="btn btn-sm btn-outline-danger"
-                            @click="deleteUser(user.user_id)">Delete</button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+        <!-- USERS -->
+        <div class="tab-pane fade show active" id="users" role="tabpanel">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">Users List</h5>
+                <button class="btn btn-sm btn-primary">+ Add User</button>
               </div>
-            </div>
-          </div>
-
-          <!-- CATEGORIES -->
-          <!-- TODO -->
-          <div class="tab-pane fade" id="categories" role="tabpanel">
-            <div class="card shadow-sm border-0">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h5 class="card-title mb-0">Categories</h5>
-                  <div class="input-group" style="max-width: 300px;">
-                    <input type="text" class="form-control" placeholder="New category">
-                    <button class="btn btn-primary">Add</button>
-                  </div>
-                </div>
-                <div class="table-responsive">
-                  <table class="table align-middle table-hover">
-                    <thead class="table-primary">
-                      <tr>
-                        <th>#</th>
-                        <th>Category Name</th>
-                        <th class="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>1</td>
-                        <td>Groceries</td>
-                        <td class="text-end">
-                          <button class="btn btn-sm btn-outline-warning me-1">Edit</button>
-                          <button class="btn btn-sm btn-outline-danger">Delete</button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>2</td>
-                        <td>Utilities</td>
-                        <td class="text-end">
-                          <button class="btn btn-sm btn-outline-warning me-1">Edit</button>
-                          <button class="btn btn-sm btn-outline-danger">Delete</button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>3</td>
-                        <td>Entertainment</td>
-                        <td class="text-end">
-                          <button class="btn btn-sm btn-outline-warning me-1">Edit</button>
-                          <button class="btn btn-sm btn-outline-danger">Delete</button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              <div class="table-responsive">
+                <table class="table align-middle table-hover">
+                  <thead class="table-primary">
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th class="text-end">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="user in users" :key="user.user_id">
+                      <td>{{ user.user_id }}</td>
+                      <td>{{ user.username }}</td>
+                      <td>{{ user.email }}</td>
+                      <td v-if="user.role == 'admin'"><span class="badge bg-success">Admin</span></td>
+                      <td v-else><span class="badge bg-secondary">User</span></td>
+                      <td class="text-end">
+                        <button class="btn btn-sm btn-outline-warning me-1" @click="editUser(user)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @click="deleteUser(user.user_id)">Delete</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         </div>
-      </main>
+
+        <!-- CATEGORIES -->
+        <div class="tab-pane fade" id="categories" role="tabpanel">
+          <div class="card shadow-sm border-0">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title mb-0">Categories</h5>
+                <div class="input-group" style="max-width: 400px;">
+                  <input v-model="newCategory" type="text" class="form-control" placeholder="New category">
+                  <select v-model="newCategoryType" class="form-select">
+                    <option value="expense">Expense</option>
+                  </select>
+                  <button class="btn btn-primary" @click="addCategory">Add</button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table align-middle table-hover">
+                  <thead class="table-primary">
+                    <tr>
+                      <th>#</th>
+                      <th>Category Name</th>
+                      <th>Type</th>
+                      <th class="text-end">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="category in categories" :key="category.id">
+                      <td>{{ category.id }}</td>
+                      <td>{{ category.name }}</td>
+                      <td>
+                        <span v-if="category.type === 'expense'" class="badge bg-danger">Expense</span>
+                      </td>
+                      <td class="text-end">
+                        <button class="btn btn-sm btn-outline-warning me-1" @click="openEditCategoryModal(category)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @click="deleteCategory(category.id)">Delete</button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p v-if="categoryError" class="text-danger mt-2">{{ categoryError }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Edit Category Modal -->
+  <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="editCategoryLabel">Edit Category</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input v-model="selectedCategory.name" class="form-control mb-2" placeholder="Category name" />
+          <select v-model="selectedCategory.type" class="form-select">
+            <option value="expense">Expense</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary" @click="updateCategory">Save changes</button>
+        </div>
+      </div>
     </div>
   </div>
+</div>
 </template>
