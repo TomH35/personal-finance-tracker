@@ -17,7 +17,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/backend': {
-        target: 'http://localhost',
+        target: 'http://localhost/personal-finance-tracker/',
         changeOrigin: true,
       },
     },
