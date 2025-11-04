@@ -26,7 +26,7 @@ class Categories {
     }
 
     // Create a new category
-    public function createCategory($name, $user_id = null, $type = 'expense') {
+    public function createCategory($name, $user_id = null, $type = 'expense', $is_predefined = false) {
         try {
             $pdo = $this->db->getPdo();
 
@@ -38,15 +38,29 @@ class Categories {
                 return ['success' => false, 'message' => 'Category name already exists'];
             }
 
-            $stmt = $pdo->prepare("INSERT INTO categories (name, user_id, type) VALUES (:name, :user_id, :type)");
-            $stmt->execute(['name' => $name, 'user_id' => $user_id, 'type' => $type]);
+            $stmt = $pdo->prepare("
+                INSERT INTO categories (name, user_id, type, is_predefined)
+                VALUES (:name, :user_id, :type, :is_predefined)
+            ");
+            $stmt->execute([
+                'name' => $name,
+                'user_id' => $user_id,
+                'type' => $type,
+                'is_predefined' => $is_predefined ? 1 : 0
+            ]);
 
             $category_id = $pdo->lastInsertId();
 
             return [
                 'success' => true,
                 'message' => 'Category created successfully',
-                'category' => ['id' => $category_id, 'name' => $name, 'user_id' => $user_id, 'type' => $type]
+                'category' => [
+                    'id' => $category_id,
+                    'name' => $name,
+                    'user_id' => $user_id,
+                    'type' => $type,
+                    'is_predefined' => $is_predefined
+                ]
             ];
         } catch (PDOException $e) {
             return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
@@ -54,10 +68,28 @@ class Categories {
     }
 
     // Get all categories
-    public function getAllCategories() {
+    // If user_id is provided, return users own categories + predefined (global) ones
+    public function getAllCategories($user_id = null) {
         try {
             $pdo = $this->db->getPdo();
-            $stmt = $pdo->query("SELECT category_id AS id, name, type, user_id FROM categories ORDER BY name ASC");
+
+            if ($user_id) {
+                $stmt = $pdo->prepare("
+                    SELECT category_id AS id, name, type, user_id, is_predefined
+                    FROM categories
+                    WHERE user_id = :user_id OR is_predefined = 1
+                    ORDER BY name ASC
+                ");
+                $stmt->execute(['user_id' => $user_id]);
+            } else {
+                // If called without user_id (admin), return all categories
+                $stmt = $pdo->query("
+                    SELECT category_id AS id, name, type, user_id, is_predefined
+                    FROM categories
+                    ORDER BY name ASC
+                ");
+            }
+
             $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
             return ['success' => true, 'categories' => $categories];
         } catch (PDOException $e) {

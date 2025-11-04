@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Auth');
 
 require_once __DIR__ . '/../../class/class-categories.php';
 require_once __DIR__ . '/../../class/class-auth.php';
@@ -18,13 +18,16 @@ $categories = new Categories();
 $data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 
+$name = $data['name'] ?? '';
+$type = $data['type'] ?? 'expense';
+
+$user_id = $auth->getUserId($jwt);
+
 if ($auth->isAdmin($jwt)) {
-    $name = $data['name'] ?? '';
-
-    $user_id = $auth->getUserId($jwt);
-
-    echo json_encode($categories->createCategory($name, $user_id));
+    //  Admiin creates global category
+    echo json_encode($categories->createCategory($name, $user_id, $type, true));
 } else {
-    echo json_encode(['success' => false, 'message' => 'Permission denied']);
+    // user only category
+    echo json_encode($categories->createCategory($name, $user_id, $type, false));
 }
 ?>
