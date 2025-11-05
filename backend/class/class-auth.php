@@ -137,11 +137,22 @@ class Auth {
             }
 
             // Check user role matches expected role
-            if ($user['role'] !== $expectedRole) {
-                return [
-                    'success' => false,
-                    'message' => 'Access denied. Only ' . ucfirst($expectedRole) . 's are allowed.'
-                ];
+            // If expectedRole is 'user', allow both 'user' and 'admin' roles
+            // If expectedRole is 'admin', only allow 'admin' role
+            if ($expectedRole === 'user') {
+                if ($user['role'] !== 'user' && $user['role'] !== 'admin') {
+                    return [
+                        'success' => false,
+                        'message' => 'Access denied. Invalid user role.'
+                    ];
+                }
+            } elseif ($expectedRole === 'admin') {
+                if ($user['role'] !== 'admin') {
+                    return [
+                        'success' => false,
+                        'message' => 'Access denied. Only Admins are allowed.'
+                    ];
+                }
             }
 
             // Load JWT secret from .env
@@ -240,6 +251,55 @@ class Auth {
             return false;
         } catch (PDOException $e) {
             error_log("Database error in isAdmin: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if a user has valid user or admin role based on JWT token
+     * 
+     * @param string $jwt The JWT token to verify
+     * @return bool True if user has 'user' or 'admin' role, false otherwise
+     */
+    public function isUser($jwt) {
+        try {
+            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
+            $dotenv->load();
+            $jwtSecret = $_ENV['JWT_SECRET'];
+
+            $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+
+            if (!isset($decoded->data->user_id)) {
+                return false;
+            }
+
+            $userId = $decoded->data->user_id;
+
+            $pdo = $this->db->getPdo();
+            $stmt = $pdo->prepare("SELECT role FROM users WHERE user_id = :user_id LIMIT 1");
+            $stmt->execute(['user_id' => $userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && ($user['role'] === 'user' || $user['role'] === 'admin')) {
+                return true;
+            }
+
+            return false;
+
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            error_log("JWT expired: " . $e->getMessage());
+            return false;
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            error_log("JWT signature invalid: " . $e->getMessage());
+            return false;
+        } catch (\Firebase\JWT\BeforeValidException $e) {
+            error_log("JWT not yet valid: " . $e->getMessage());
+            return false;
+        } catch (Exception $e) {
+            error_log("JWT verification error: " . $e->getMessage());
+            return false;
+        } catch (PDOException $e) {
+            error_log("Database error in isUser: " . $e->getMessage());
             return false;
         }
     }
