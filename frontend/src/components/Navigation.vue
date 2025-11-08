@@ -10,14 +10,49 @@
         <li class="nav-item">
           <RouterLink class="nav-link" to="/">Home</RouterLink>
         </li>
-        <li class="nav-item">
-          <RouterLink class="nav-link" to="/login">Login</RouterLink>
-        </li>
+        <template v-if="!isLoggedIn">
+          <li class="nav-item">
+            <RouterLink class="nav-link" to="/login">Login</RouterLink>
+          </li>
+        </template>
+        <template v-else>
+          <li class="nav-item">
+            <a class="nav-link" href="#" @click.prevent="handleLogout">Logout</a>
+          </li>
+        </template>
       </ul>
     </div>
   </nav>
 </template>
 
 <script setup>
-// Bootstrap-only UI; routing handled by <RouterLink>
+import { useLoginStore } from '../stores/loginStore'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+
+const loginStore = useLoginStore()
+const router = useRouter()
+
+const isLoggedIn = computed(() => !!loginStore.jwt)
+const isAdminUser = computed(() => {
+  try {
+    const token = loginStore.jwt
+    if (!token) return false
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.role === 'admin'
+  } catch {
+    return false
+  }
+})
+
+const handleLogout = () => {
+  const wasAdmin = isAdminUser.value
+  loginStore.clearJwt()
+  
+  if (wasAdmin) {
+    router.push('/admin-login')
+  } else {
+    router.push('/login')
+  }
+}
 </script>
