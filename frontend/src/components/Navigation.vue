@@ -48,7 +48,6 @@ const isAdminUser = computed(() => {
 const handleLogout = () => {
   const wasAdmin = isAdminUser.value
   loginStore.clearJwt()
-  
   if (wasAdmin) {
     router.push('/admin-login')
   } else {
