@@ -1,10 +1,10 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: PUT');
+header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type, Auth');
 
-require_once __DIR__ . '/../../class/class-categories.php';
+require_once __DIR__ . '/../../class/class-income.php';
 require_once __DIR__ . '/../../class/class-auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -13,9 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $auth = new Auth();
-$categories = new Categories();
+$income = new Income();
 
-$data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 
 $user_id = $auth->getUserId($jwt);
@@ -26,9 +25,9 @@ if (!$user_id) {
     exit();
 }
 
-$id = $data['id'] ?? 0;
-$name = $data['name'] ?? '';
-$type = $data['type'] ?? 'income';
+$start_date = $_GET['start_date'] ?? null;
+$end_date = $_GET['end_date'] ?? null;
+$category_id = $_GET['category_id'] ?? null;
 
-echo json_encode($categories->updateCategory($id, $name, $type));
+echo json_encode($income->getAllIncome($user_id, $start_date, $end_date, $category_id));
 ?>

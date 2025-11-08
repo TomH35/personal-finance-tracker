@@ -4,7 +4,7 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: PUT');
 header('Access-Control-Allow-Headers: Content-Type, Auth');
 
-require_once __DIR__ . '/../../class/class-categories.php';
+require_once __DIR__ . '/../../class/class-income.php';
 require_once __DIR__ . '/../../class/class-auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $auth = new Auth();
-$categories = new Categories();
+$income = new Income();
 
 $data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
@@ -26,9 +26,17 @@ if (!$user_id) {
     exit();
 }
 
-$id = $data['id'] ?? 0;
-$name = $data['name'] ?? '';
-$type = $data['type'] ?? 'income';
+$transaction_id = $data['id'] ?? null;
+$amount = $data['amount'] ?? null;
+$category_id = $data['category_id'] ?? null;
+$note = $data['note'] ?? null;
+$date = $data['date'] ?? null;
 
-echo json_encode($categories->updateCategory($id, $name, $type));
+if (!$transaction_id) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Income ID is required']);
+    exit();
+}
+
+echo json_encode($income->updateIncome($transaction_id, $user_id, $amount, $category_id, $note, $date));
 ?>
