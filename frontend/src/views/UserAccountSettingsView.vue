@@ -174,8 +174,6 @@ import { ref, onMounted } from 'vue'
 import { useLoginStore } from '@/stores/loginStore'
 import { useRouter } from 'vue-router'
 
-const API_BASE_URL = 'http://localhost/personal-finance-tracker/backend/api'
-
 export default {
   name: 'AccountSettingsView',
   setup() {
