@@ -306,11 +306,9 @@ class Auth {
 
     /**
      * Get user ID from JWT token
-     * Validates and decodes the JWT, verifies the user exists in the database,
-     * and returns the user ID
      * 
-     * @param string $jwt The JWT token to verify
-     * @return int|null The user ID if valid and user exists, null otherwise
+     * @param string $jwt The JWT token to decode
+     * @return int|null The user ID from the token, null if token is invalid or user_id is not present
      */
     public function getUserId($jwt) {
         try {
@@ -325,19 +323,7 @@ class Auth {
                 return null;
             }
 
-            $userId = $decoded->data->user_id;
-
-            $pdo = $this->db->getPdo();
-            $stmt = $pdo->prepare("SELECT user_id FROM users WHERE user_id = :user_id LIMIT 1");
-            $stmt->execute(['user_id' => $userId]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$user) {
-                error_log("User with ID $userId does not exist in database");
-                return null;
-            }
-
-            return (int)$user['user_id'];
+            return (int)$decoded->data->user_id;
 
         } catch (\Firebase\JWT\ExpiredException $e) {
             error_log("JWT expired: " . $e->getMessage());
@@ -350,9 +336,6 @@ class Auth {
             return null;
         } catch (Exception $e) {
             error_log("JWT verification error: " . $e->getMessage());
-            return null;
-        } catch (PDOException $e) {
-            error_log("Database error in getUserId: " . $e->getMessage());
             return null;
         }
     }
