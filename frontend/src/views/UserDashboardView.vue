@@ -229,8 +229,6 @@ import { useLoginStore } from '@/stores/loginStore'
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-const API_BASE_URL = 'http://localhost/personal-finance-tracker/backend/api'
-
 export default {
   name: 'UserDashboardView',
   setup() {
@@ -269,7 +267,7 @@ export default {
     async function loadIncome() {
       loading.value = true
       try {
-        const response = await fetch(`${API_BASE_URL}/income-api/income-get-all-api.php`, {
+        const response = await fetch('/backend/api/income-api/income-get-all-api.php', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -289,7 +287,7 @@ export default {
 
     async function loadCategories() {
       try {
-        const response = await fetch(`${API_BASE_URL}/category-api/category-get-all-api.php`, {
+        const response = await fetch('/backend/api/category-api/category-get-all-api.php', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -308,7 +306,7 @@ export default {
     async function addIncome() {
       loading.value = true
       try {
-        const response = await fetch(`${API_BASE_URL}/income-api/income-create-api.php`, {
+        const response = await fetch('/backend/api/income-api/income-create-api.php', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -350,7 +348,7 @@ export default {
 
       loading.value = true
       try {
-        const response = await fetch(`${API_BASE_URL}/income-api/income-delete-api.php`, {
+        const response = await fetch('/backend/api/income-api/income-delete-api.php', {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -392,7 +390,7 @@ export default {
     async function updateIncome() {
       loading.value = true
       try {
-        const response = await fetch(`${API_BASE_URL}/income-api/income-edit-api.php`, {
+        const response = await fetch('/backend/api/income-api/income-edit-api.php', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
