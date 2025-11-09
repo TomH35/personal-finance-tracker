@@ -1,8 +1,5 @@
 <template>
   <div class="bg-light min-vh-100">
-    <!-- Header -->
-    <Navigation />
-
     <!-- Main Content -->
     <div class="container py-5">
       <div class="row justify-content-center">
@@ -173,7 +170,6 @@
 </template>
 
 <script>
-import Navigation from '@/components/Navigation.vue'
 import { ref, onMounted } from 'vue'
 import { useLoginStore } from '@/stores/loginStore'
 import { useRouter } from 'vue-router'
@@ -182,9 +178,6 @@ const API_BASE_URL = 'http://localhost/personal-finance-tracker/backend/api'
 
 export default {
   name: 'AccountSettingsView',
-  components: {
-    Navigation
-  },
   setup() {
     const loginStore = useLoginStore()
     const router = useRouter()
