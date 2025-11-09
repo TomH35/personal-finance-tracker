@@ -17,6 +17,12 @@
         </template>
         <template v-else>
           <li class="nav-item">
+            <RouterLink class="nav-link" to="/user-dashboard">Dashboard</RouterLink>
+          </li>
+          <li class="nav-item">
+            <RouterLink class="nav-link" to="/account-settings">Settings</RouterLink>
+          </li>
+          <li class="nav-item">
             <a class="nav-link" href="#" @click.prevent="handleLogout">Logout</a>
           </li>
         </template>
