@@ -25,21 +25,11 @@
           <div class="card border-0 shadow-sm">
             <div class="card-body">
               <h6 class="fw-semibold mb-3">Income Categories</h6>
-              <ul class="list-group list-group-flush mb-3">
+              <ul class="list-group list-group-flush">
                 <li v-for="cat in incomeCategories" :key="cat.id" class="list-group-item small">
                   {{ cat.name }}
                 </li>
               </ul>
-              <div class="input-group input-group-sm">
-                <input
-                  type="text"
-                  v-model="newCategory"
-                  class="form-control"
-                  placeholder="New income category"
-                  @keyup.enter="addCategory"
-                />
-                <button class="btn btn-primary" @click="addCategory">Add</button>
-              </div>
             </div>
           </div>
         </nav>
@@ -58,11 +48,11 @@
             <button type="button" class="btn-close" @click="errorMessage = ''"></button>
           </div>
 
-          <!-- Add/Edit Income -->
+          <!-- Add Income -->
           <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
-              <h6 class="fw-semibold mb-3">{{ editingId ? 'Edit Income' : 'Add Income' }}</h6>
-              <form @submit.prevent="editingId ? updateIncome() : addIncome()">
+              <h6 class="fw-semibold mb-3">Add Income</h6>
+              <form @submit.prevent="addIncome()">
                 <div class="row g-2">
                   <div class="col-md-3">
                     <input
@@ -100,11 +90,8 @@
                   </div>
                   <div class="col-12 mt-3">
                     <button class="btn btn-primary" :disabled="loading">
-                      <span v-if="loading">{{ editingId ? 'Updating...' : 'Adding...' }}</span>
-                      <span v-else>{{ editingId ? 'Update Income' : 'Add Income' }}</span>
-                    </button>
-                    <button v-if="editingId" type="button" class="btn btn-secondary ms-2" @click="cancelEdit">
-                      Cancel
+                      <span v-if="loading">Adding...</span>
+                      <span v-else>Add Income</span>
                     </button>
                   </div>
                 </div>
@@ -173,6 +160,67 @@
         </main>
       </div>
     </div>
+
+    <!-- Edit Income Modal -->
+    <div class="modal fade" id="editIncomeModal" tabindex="-1" aria-labelledby="editIncomeModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editIncomeModalLabel">Edit Income</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form @submit.prevent="updateIncome">
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Amount</label>
+                <input
+                  type="number"
+                  v-model="editFormData.amount"
+                  class="form-control"
+                  placeholder="Amount"
+                  step="0.01"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Category</label>
+                <select v-model="editFormData.category_id" class="form-select" required>
+                  <option value="">Select Category</option>
+                  <option v-for="cat in incomeCategories" :key="cat.id" :value="cat.id">
+                    {{ cat.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Date</label>
+                <input
+                  type="date"
+                  v-model="editFormData.date"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Note (optional)</label>
+                <input
+                  type="text"
+                  v-model="editFormData.note"
+                  class="form-control"
+                  placeholder="Note"
+                />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                Update Income
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -192,7 +240,6 @@ export default {
     const incomeList = ref([])
     const categories = ref([])
     const loading = ref(false)
-    const newCategory = ref('')
     const successMessage = ref('')
     const errorMessage = ref('')
     const editingId = ref(null)
@@ -201,6 +248,12 @@ export default {
       category_id: '',
       note: '',
       date: new Date().toISOString().split('T')[0]
+    })
+    const editFormData = ref({
+      amount: '',
+      category_id: '',
+      note: '',
+      date: ''
     })
 
     // Computed
@@ -249,36 +302,6 @@ export default {
         }
       } catch (err) {
         console.error('Failed to load categories:', err)
-      }
-    }
-
-    async function addCategory() {
-      const name = newCategory.value.trim()
-      if (!name) return
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/category-api/category-create-api.php`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
-          body: JSON.stringify({ name, type: 'income' })
-        })
-        const data = await response.json()
-        
-        if (data.success) {
-          successMessage.value = 'Category added successfully!'
-          newCategory.value = ''
-          await loadCategories()
-          setTimeout(() => successMessage.value = '', 3000)
-        } else {
-          errorMessage.value = data.message || 'Failed to add category'
-          setTimeout(() => errorMessage.value = '', 3000)
-        }
-      } catch (err) {
-        errorMessage.value = 'Failed to add category'
-        setTimeout(() => errorMessage.value = '', 3000)
       }
     }
 
@@ -355,13 +378,15 @@ export default {
 
     function editIncomeItem(income) {
       editingId.value = income.id
-      formData.value = {
+      editFormData.value = {
         amount: income.amount,
         category_id: income.category_id,
         note: income.note || '',
         date: income.date
       }
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      // Open Bootstrap modal
+      const modal = new window.bootstrap.Modal(document.getElementById('editIncomeModal'))
+      modal.show()
     }
 
     async function updateIncome() {
@@ -375,17 +400,20 @@ export default {
           },
           body: JSON.stringify({
             id: editingId.value,
-            amount: formData.value.amount,
-            category_id: formData.value.category_id,
-            note: formData.value.note || null,
-            date: formData.value.date
+            amount: editFormData.value.amount,
+            category_id: editFormData.value.category_id,
+            note: editFormData.value.note || null,
+            date: editFormData.value.date
           })
         })
         const data = await response.json()
 
         if (data.success) {
           successMessage.value = 'Income updated successfully!'
-          cancelEdit()
+          // Close modal
+          const modal = window.bootstrap.Modal.getInstance(document.getElementById('editIncomeModal'))
+          modal.hide()
+          editingId.value = null
           await loadIncome()
           setTimeout(() => successMessage.value = '', 3000)
         } else {
@@ -397,16 +425,6 @@ export default {
         setTimeout(() => errorMessage.value = '', 3000)
       } finally {
         loading.value = false
-      }
-    }
-
-    function cancelEdit() {
-      editingId.value = null
-      formData.value = {
-        amount: '',
-        category_id: '',
-        note: '',
-        date: new Date().toISOString().split('T')[0]
       }
     }
 
@@ -426,19 +444,17 @@ export default {
       incomeList,
       categories,
       loading,
-      newCategory,
       successMessage,
       errorMessage,
       editingId,
       formData,
+      editFormData,
       incomeCategories,
       totalIncome,
       loadIncome,
-      addCategory,
       addIncome,
       editIncomeItem,
       updateIncome,
-      cancelEdit,
       deleteIncomeItem
     }
   }

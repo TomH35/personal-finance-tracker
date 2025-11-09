@@ -18,14 +18,13 @@ $income = new Income();
 $data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 
-$user_id = $auth->getUserId($jwt);
-
-if (!$user_id) {
+if (!$auth->isUser($jwt)) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
 
+$user_id = $auth->getUserId($jwt);
 $transaction_id = $data['id'] ?? null;
 
 if (!$transaction_id) {
