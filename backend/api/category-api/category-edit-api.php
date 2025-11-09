@@ -1,8 +1,8 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: PUT');
-header('Access-Control-Allow-Headers: Content-Type, Auth');
+header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Headers: Content-Type');
 
 require_once __DIR__ . '/../../class/class-categories.php';
 require_once __DIR__ . '/../../class/class-auth.php';
@@ -18,17 +18,12 @@ $categories = new Categories();
 $data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 
-$user_id = $auth->getUserId($jwt);
-
-if (!$user_id) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
-    exit();
+if ($auth->isAdmin($jwt)) {
+    $id = $data['id'] ?? 0;
+    $name = $data['name'] ?? '';
+    $type = $data['type']; 
+    echo json_encode($categories->updateCategory($id, $name, $type));
+} else {
+    echo json_encode(['success' => false, 'message' => 'Permission denied']);
 }
-
-$id = $data['id'] ?? 0;
-$name = $data['name'] ?? '';
-$type = $data['type'] ?? 'income';
-
-echo json_encode($categories->updateCategory($id, $name, $type));
 ?>
