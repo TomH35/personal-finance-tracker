@@ -10,18 +10,23 @@ require_once __DIR__ . '/../../class/class-auth.php';
 $auth = new Auth();
 $limits = new Limits();
 
-$data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 $user_id = $auth->getUserId($jwt);
 
 if (!$user_id) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    echo json_encode(['success'=>false,'message'=>'Unauthorized']);
     exit;
 }
 
-$warning = $data['warning_limit'] ?? 0;
-$critical = $data['critical_limit'] ?? 0;
+$data = json_decode(file_get_contents("php://input"), true);
 $enabled = isset($data['enabled']) ? (int)$data['enabled'] : 1;
 
-echo json_encode($limits->setLimit($user_id, $warning, $critical, $enabled));
+try {
+    $pdo = $limits->db->getPdo();
+    $stmt = $pdo->prepare("UPDATE spending_limits SET enabled = :enabled WHERE user_id = :user_id");
+    $stmt->execute(['enabled'=>$enabled,'user_id'=>$user_id]);
+    echo json_encode(['success'=>true,'message'=>'Limits toggled']);
+} catch (PDOException $e) {
+    echo json_encode(['success'=>false,'message'=>'Database error: '.$e->getMessage()]);
+}
 ?>

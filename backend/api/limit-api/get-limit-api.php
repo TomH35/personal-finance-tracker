@@ -18,8 +18,5 @@ if (!$user_id) {
     exit;
 }
 
-$month = isset($_GET['month']) ? (int)$_GET['month'] : null;
-$year = isset($_GET['year']) ? (int)$_GET['year'] : null;
-
-echo json_encode($limits->getLimit($user_id, $month, $year));
+echo json_encode($limits->getLimit($user_id));
 ?>

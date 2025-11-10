@@ -74,24 +74,26 @@
 
               <hr class="my-5">
 
+              <!-- Toggle Limits -->
+              <div class="mb-3">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="toggleLimits" v-model="limitsEnabled" @change="updateLimitsToggle">
+                  <label class="form-check-label" for="toggleLimits">
+                    Enable Monthly Expense Limits
+                  </label>
+                </div>
+              </div>
+
               <!-- Monthly Expense Limits -->
-              <div class="mb-5">
+              <div v-if="limitsEnabled" class="mb-5">
                 <h5 class="fw-semibold mb-3">Monthly Expense Limits</h5>
                 <form @submit.prevent="submitLimit">
                   <div class="row g-3">
-                    <div class="col-md-2">
-                      <label class="form-label">Month</label>
-                      <input type="number" min="1" max="12" v-model="limitForm.month" class="form-control" required />
-                    </div>
-                    <div class="col-md-2">
-                      <label class="form-label">Year</label>
-                      <input type="number" min="2000" max="2100" v-model="limitForm.year" class="form-control" required />
-                    </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                       <label class="form-label">Warning Limit</label>
                       <input type="number" v-model="limitForm.warning_limit" class="form-control" placeholder="e.g. 500" required />
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6">
                       <label class="form-label">Critical Limit</label>
                       <input type="number" v-model="limitForm.critical_limit" class="form-control" placeholder="e.g. 1000" required />
                     </div>
@@ -108,11 +110,11 @@
                 <hr class="my-4">
 
                 <!-- Existing Limits -->
-                <div v-if="allLimits.length">
+                <div v-if="allLimits.filter(l => l.enabled).length">
                   <h6 class="fw-semibold mb-3">Existing Limits</h6>
-                  <div v-for="limit in allLimits" :key="limit.limit_id" class="d-flex align-items-center justify-content-between mb-2 p-2 border rounded">
+                  <div v-for="limit in allLimits.filter(l => l.enabled)" :key="limit.limit_id" class="d-flex align-items-center justify-content-between mb-2 p-2 border rounded">
                     <div>
-                      <strong>{{ limit.month }}/{{ limit.year }}</strong> - Warning: {{ limit.warning_limit }}, Critical: {{ limit.critical_limit }}
+                      <strong>Warning: {{ limit.warning_limit }}, Critical: {{ limit.critical_limit }}</strong>
                     </div>
                     <div>
                       <button class="btn btn-sm btn-outline-secondary me-2" @click="editLimit(limit)">Edit</button>
@@ -199,11 +201,12 @@ export default {
 
     const profileForm = ref({ name: '', email: '' })
     const passwordForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '' })
-    const limitForm = ref({ limit_id:null, month: new Date().getMonth()+1, year: new Date().getFullYear(), warning_limit: 0, critical_limit: 0 })
+    const limitForm = ref({ limit_id:null, warning_limit:0, critical_limit:0 })
     const deleteForm = ref({ password: '' })
     const allLimits = ref([])
+    const limitsEnabled = ref(true)
+    const userToggled = ref(false) // track if user clicked toggle
 
-    // Load profile
     async function loadProfile() {
       try {
         profileForm.value.name = 'John Doe'
@@ -211,23 +214,44 @@ export default {
       } catch (err) { console.error(err) }
     }
 
-    // Load limits
     async function loadLimits() {
       try {
         const res = await fetch(`/backend/api/limit-api/get-limit-api.php`, {
           headers: { 'auth': `Bearer ${loginStore.jwt}` }
         })
         const data = await res.json()
-        if (data.success && data.limit) allLimits.value = Array.isArray(data.limit) ? data.limit : [data.limit]
+        if (data.success && data.limit) {
+          allLimits.value = Array.isArray(data.limit) ? data.limit : [data.limit]
+          if (!userToggled.value) {
+            limitsEnabled.value = allLimits.value.some(l => l.enabled)
+          }
+        }
       } catch (err) { console.error(err) }
     }
 
-    // Submit limit (new or edit)
+    async function updateLimitsToggle() {
+      userToggled.value = true
+      try {
+        const res = await fetch(`/backend/api/limit-api/toggle-limit-api.php`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
+          body: JSON.stringify({ enabled: limitsEnabled.value ? 1 : 0 })
+        })
+        const data = await res.json()
+        if (!data.success) throw new Error(data.message)
+        await loadLimits()
+      } catch (err) {
+        errorMessage.value = 'Failed to update toggle'
+        limitsEnabled.value = !limitsEnabled.value
+        setTimeout(()=>errorMessage.value='',3000)
+      }
+    }
+
     async function submitLimit() {
       loadingLimit.value = true
       try {
-        let url = limitForm.value.limit_id 
-          ? `/backend/api/limit-api/edit-limit-api.php` 
+        const url = limitForm.value.limit_id
+          ? `/backend/api/limit-api/edit-limit-api.php`
           : `/backend/api/limit-api/set-limit-api.php`
 
         const res = await fetch(url, {
@@ -235,32 +259,25 @@ export default {
           headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
           body: JSON.stringify(limitForm.value)
         })
-
         const data = await res.json()
         if (data.success) {
           successMessage.value = data.message
-          setTimeout(() => successMessage.value='', 3000)
+          setTimeout(()=>successMessage.value='',3000)
           await loadLimits()
           cancelEdit()
         } else errorMessage.value = data.message
-      } catch {
-        errorMessage.value = 'Network error'
-      } finally {
-        loadingLimit.value = false
-      }
+      } catch { errorMessage.value = 'Network error' }
+      finally { loadingLimit.value = false }
     }
 
-    // Edit existing limit
     function editLimit(limit) {
       limitForm.value = { ...limit }
     }
 
-    // Cancel edit
     function cancelEdit() {
-      limitForm.value = { limit_id:null, month: new Date().getMonth()+1, year: new Date().getFullYear(), warning_limit:0, critical_limit:0 }
+      limitForm.value = { limit_id:null, warning_limit:0, critical_limit:0 }
     }
 
-    // Delete limit
     async function deleteLimit(id) {
       loadingLimit.value = true
       try {
@@ -277,13 +294,13 @@ export default {
       finally { loadingLimit.value = false }
     }
 
-    // Profile & password updates
     async function updateProfile() {
       loadingProfile.value = true
       errorMessage.value = ''
       successMessage.value = ''
-      try { await new Promise(r => setTimeout(r, 1000)); successMessage.value = 'Profile updated successfully!'; setTimeout(() => successMessage.value='',3000) }
-      catch { errorMessage.value = 'Failed to update profile' } finally { loadingProfile.value = false }
+      try { await new Promise(r => setTimeout(r, 1000)); successMessage.value='Profile updated successfully!'; setTimeout(()=>successMessage.value='',3000) }
+      catch { errorMessage.value='Failed to update profile' }
+      finally { loadingProfile.value = false }
     }
 
     async function updatePassword() {
@@ -308,9 +325,11 @@ export default {
       await loadLimits()
     })
 
-    return { successMessage, errorMessage, loadingProfile, loadingPassword, loadingLimit, loadingDelete, showDeleteModal,
-      profileForm, passwordForm, limitForm, deleteForm, allLimits,
-      updateProfile, updatePassword, submitLimit, deleteAccount, editLimit, deleteLimit, cancelEdit }
+    return {
+      successMessage, errorMessage, loadingProfile, loadingPassword, loadingLimit, loadingDelete, showDeleteModal,
+      profileForm, passwordForm, limitForm, deleteForm, allLimits, limitsEnabled,
+      updateProfile, updatePassword, submitLimit, deleteAccount, editLimit, deleteLimit, cancelEdit, updateLimitsToggle
+    }
   }
 }
 </script>

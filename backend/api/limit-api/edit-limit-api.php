@@ -15,21 +15,20 @@ $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 $user_id = $auth->getUserId($jwt);
 
 if (!$user_id) {
-    echo json_encode(['success'=>false,'message'=>'Unauthorized']);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
 $limit_id = $data['limit_id'] ?? null;
-$month = $data['month'] ?? null;
-$year = $data['year'] ?? null;
 $warning = $data['warning_limit'] ?? null;
 $critical = $data['critical_limit'] ?? null;
+$enabled = isset($data['enabled']) ? (int)$data['enabled'] : 1;
 
-if (!$limit_id || !$month || !$year || $warning === null || $critical === null) {
-    echo json_encode(['success'=>false,'message'=>'All fields are required']);
+if (!$limit_id || $warning === null || $critical === null) {
+    echo json_encode(['success' => false, 'message' => 'All fields are required']);
     exit;
 }
 
-$result = $limits->editLimit($user_id, $limit_id, $month, $year, $warning, $critical);
+$result = $limits->editLimit($user_id, $limit_id, $warning, $critical, $enabled);
 echo json_encode($result);
 ?>
