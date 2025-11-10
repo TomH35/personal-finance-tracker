@@ -11,22 +11,22 @@ $auth = new Auth();
 $limits = new Limits();
 
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
-$user_id = $auth->getUserId($jwt);
 
-if (!$user_id) {
+if (!$auth->isUser($jwt)) {
     echo json_encode(['success'=>false,'message'=>'Unauthorized']);
     exit;
 }
 
+$user_id = $auth->getUserId($jwt);
 $data = json_decode(file_get_contents("php://input"), true);
+$limit_id = $data['limit_id'] ?? null;
 $enabled = isset($data['enabled']) ? (int)$data['enabled'] : 1;
 
-try {
-    $pdo = $limits->db->getPdo();
-    $stmt = $pdo->prepare("UPDATE spending_limits SET enabled = :enabled WHERE user_id = :user_id");
-    $stmt->execute(['enabled'=>$enabled,'user_id'=>$user_id]);
-    echo json_encode(['success'=>true,'message'=>'Limits toggled']);
-} catch (PDOException $e) {
-    echo json_encode(['success'=>false,'message'=>'Database error: '.$e->getMessage()]);
+if (!$limit_id) {
+    echo json_encode(['success' => false, 'message' => 'limit_id is required']);
+    exit;
 }
+
+$result = $limits->toggleLimit($user_id, $limit_id, $enabled);
+echo json_encode($result);
 ?>

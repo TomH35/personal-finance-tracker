@@ -42,17 +42,13 @@ class Limits {
     public function editLimit($user_id, $limit_id, $warning_limit, $critical_limit, $enabled = 1) {
         try {
             $pdo = $this->db->getPdo();
-            $stmtCheck = $pdo->prepare("SELECT * FROM spending_limits WHERE limit_id = :limit_id AND user_id = :user_id");
-            $stmtCheck->execute(['limit_id' => $limit_id, 'user_id' => $user_id]);
-            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
-            if (!$existing) return ['success' => false, 'message' => 'Limit not found'];
-
-            $stmt = $pdo->prepare("UPDATE spending_limits SET warning_limit = :warning, critical_limit = :critical, enabled = :enabled WHERE limit_id = :limit_id");
+            $stmt = $pdo->prepare("UPDATE spending_limits SET warning_limit = :warning, critical_limit = :critical, enabled = :enabled WHERE limit_id = :limit_id AND user_id = :user_id");
             $stmt->execute([
                 'warning' => $warning_limit,
                 'critical' => $critical_limit,
                 'enabled' => $enabled,
-                'limit_id' => $limit_id
+                'limit_id' => $limit_id,
+                'user_id' => $user_id
             ]);
 
             return ['success' => true, 'message' => 'Limit updated successfully'];
@@ -77,13 +73,8 @@ class Limits {
     public function toggleLimit($user_id, $limit_id, $enabled) {
         try {
             $pdo = $this->db->getPdo();
-            $stmtCheck = $pdo->prepare("SELECT * FROM spending_limits WHERE limit_id = :limit_id AND user_id = :user_id");
-            $stmtCheck->execute(['limit_id' => $limit_id, 'user_id' => $user_id]);
-            $existing = $stmtCheck->fetch(PDO::FETCH_ASSOC);
-            if (!$existing) return ['success' => false, 'message' => 'Limit not found'];
-
-            $stmt = $pdo->prepare("UPDATE spending_limits SET enabled = :enabled WHERE limit_id = :limit_id");
-            $stmt->execute(['enabled' => $enabled ? 1 : 0, 'limit_id' => $limit_id]);
+            $stmt = $pdo->prepare("UPDATE spending_limits SET enabled = :enabled WHERE limit_id = :limit_id AND user_id = :user_id");
+            $stmt->execute(['enabled' => $enabled ? 1 : 0, 'limit_id' => $limit_id, 'user_id' => $user_id]);
 
             return ['success' => true, 'message' => 'Limit toggled'];
         } catch (PDOException $e) {

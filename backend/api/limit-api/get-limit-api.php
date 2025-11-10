@@ -11,12 +11,12 @@ $auth = new Auth();
 $limits = new Limits();
 
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
-$user_id = $auth->getUserId($jwt);
 
-if (!$user_id) {
+if (!$auth->isUser($jwt)) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
+$user_id = $auth->getUserId($jwt);
 echo json_encode($limits->getLimit($user_id));
 ?>

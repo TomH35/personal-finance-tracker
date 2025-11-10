@@ -11,13 +11,13 @@ $auth = new Auth();
 $limits = new Limits();
 
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
-$user_id = $auth->getUserId($jwt);
 
-if (!$user_id) {
+if (!$auth->isUser($jwt)) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
+$user_id = $auth->getUserId($jwt);
 $limit_id = $_GET['limit_id'] ?? null;
 if (!$limit_id) {
     echo json_encode(['success' => false, 'message' => 'Limit ID is required']);

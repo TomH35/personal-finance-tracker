@@ -12,13 +12,13 @@ $limits = new Limits();
 
 $data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
-$user_id = $auth->getUserId($jwt);
 
-if (!$user_id) {
+if (!$auth->isUser($jwt)) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
+$user_id = $auth->getUserId($jwt);
 $warning = $data['warning_limit'] ?? 0;
 $critical = $data['critical_limit'] ?? 0;
 $enabled = isset($data['enabled']) ? (int)$data['enabled'] : 1;

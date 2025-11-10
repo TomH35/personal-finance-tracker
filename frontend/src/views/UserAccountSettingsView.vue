@@ -101,27 +101,10 @@
                   <div class="text-end mt-3">
                     <button type="submit" class="btn btn-primary" :disabled="loadingLimit">
                       <span v-if="loadingLimit" class="spinner-border spinner-border-sm me-2"></span>
-                      {{ limitForm.limit_id ? 'Update Limit' : 'Save Limit' }}
+                      Save Limits
                     </button>
-                    <button v-if="limitForm.limit_id" type="button" class="btn btn-outline-secondary ms-2" @click="cancelEdit">Cancel Edit</button>
                   </div>
                 </form>
-
-                <hr class="my-4">
-
-                <!-- Existing Limits -->
-                <div v-if="allLimits.filter(l => l.enabled).length">
-                  <h6 class="fw-semibold mb-3">Existing Limits</h6>
-                  <div v-for="limit in allLimits.filter(l => l.enabled)" :key="limit.limit_id" class="d-flex align-items-center justify-content-between mb-2 p-2 border rounded">
-                    <div>
-                      <strong>Warning: {{ limit.warning_limit }}, Critical: {{ limit.critical_limit }}</strong>
-                    </div>
-                    <div>
-                      <button class="btn btn-sm btn-outline-secondary me-2" @click="editLimit(limit)">Edit</button>
-                      <button class="btn btn-sm btn-outline-danger" @click="deleteLimit(limit.limit_id)">Delete</button>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <hr class="my-5">
@@ -201,10 +184,10 @@ export default {
 
     const profileForm = ref({ name: '', email: '' })
     const passwordForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '' })
-    const limitForm = ref({ limit_id:null, warning_limit:0, critical_limit:0 })
+    const limitForm = ref({ limit_id: null, warning_limit: '', critical_limit: '' })
     const deleteForm = ref({ password: '' })
     const allLimits = ref([])
-    const limitsEnabled = ref(true)
+    const limitsEnabled = ref(false)
     const userToggled = ref(false) // track if user clicked toggle
 
     async function loadProfile() {
@@ -220,11 +203,32 @@ export default {
           headers: { 'auth': `Bearer ${loginStore.jwt}` }
         })
         const data = await res.json()
-        if (data.success && data.limit) {
+        if (data.success && data.limit && data.limit.length > 0) {
           allLimits.value = Array.isArray(data.limit) ? data.limit : [data.limit]
-          if (!userToggled.value) {
-            limitsEnabled.value = allLimits.value.some(l => l.enabled)
+          
+          // Get the first limit (there should only be one per user)
+          const userLimit = allLimits.value[0]
+          
+          if (userLimit) {
+            // Always store the limit_id regardless of enabled status
+            limitForm.value.limit_id = userLimit.limit_id
+            
+            // Set toggle and form values based on enabled status
+            if (userLimit.enabled) {
+              limitsEnabled.value = true
+              limitForm.value.warning_limit = userLimit.warning_limit
+              limitForm.value.critical_limit = userLimit.critical_limit
+            } else {
+              limitsEnabled.value = false
+              // Keep limit_id but clear the values when disabled
+              limitForm.value.warning_limit = ''
+              limitForm.value.critical_limit = ''
+            }
           }
+        } else {
+          // No limits exist at all - reset everything
+          limitsEnabled.value = false
+          limitForm.value = { limit_id: null, warning_limit: '', critical_limit: '' }
         }
       } catch (err) { console.error(err) }
     }
@@ -232,14 +236,26 @@ export default {
     async function updateLimitsToggle() {
       userToggled.value = true
       try {
-        const res = await fetch(`/backend/api/limit-api/toggle-limit-api.php`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
-          body: JSON.stringify({ enabled: limitsEnabled.value ? 1 : 0 })
-        })
-        const data = await res.json()
-        if (!data.success) throw new Error(data.message)
-        await loadLimits()
+        // Only call the API if there's a limit_id to toggle (i.e., a limit already exists)
+        if (limitForm.value.limit_id) {
+          const res = await fetch(`/backend/api/limit-api/toggle-limit-api.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
+            body: JSON.stringify({ 
+              limit_id: limitForm.value.limit_id,
+              enabled: limitsEnabled.value ? 1 : 0 
+            })
+          })
+          const data = await res.json()
+          if (!data.success) throw new Error(data.message)
+          await loadLimits()
+        } else {
+          // No existing limit - if toggling off, just clear the form
+          if (!limitsEnabled.value) {
+            limitForm.value = { limit_id: null, warning_limit: '', critical_limit: '' }
+          }
+          // If toggling on with no existing limit, just show the form - user will create it by clicking Save Limits
+        }
       } catch (err) {
         errorMessage.value = 'Failed to update toggle'
         limitsEnabled.value = !limitsEnabled.value
@@ -257,40 +273,24 @@ export default {
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
-          body: JSON.stringify(limitForm.value)
+          body: JSON.stringify({
+            ...limitForm.value,
+            enabled: 1
+          })
         })
         const data = await res.json()
         if (data.success) {
-          successMessage.value = data.message
+          successMessage.value = limitForm.value.limit_id ? 'Limits updated successfully!' : 'Limits saved successfully!'
           setTimeout(()=>successMessage.value='',3000)
           await loadLimits()
-          cancelEdit()
-        } else errorMessage.value = data.message
-      } catch { errorMessage.value = 'Network error' }
-      finally { loadingLimit.value = false }
-    }
-
-    function editLimit(limit) {
-      limitForm.value = { ...limit }
-    }
-
-    function cancelEdit() {
-      limitForm.value = { limit_id:null, warning_limit:0, critical_limit:0 }
-    }
-
-    async function deleteLimit(id) {
-      loadingLimit.value = true
-      try {
-        const res = await fetch(`/backend/api/limit-api/delete-limit-api.php?limit_id=${id}`, {
-          method: 'DELETE',
-          headers: { 'auth': `Bearer ${loginStore.jwt}` }
-        })
-        const data = await res.json()
-        if (data.success) {
-          successMessage.value = data.message
-          await loadLimits()
-        } else errorMessage.value = data.message
-      } catch { errorMessage.value = 'Network error' }
+        } else {
+          errorMessage.value = data.message
+          setTimeout(()=>errorMessage.value='',3000)
+        }
+      } catch { 
+        errorMessage.value = 'Network error'
+        setTimeout(()=>errorMessage.value='',3000)
+      }
       finally { loadingLimit.value = false }
     }
 
@@ -328,7 +328,7 @@ export default {
     return {
       successMessage, errorMessage, loadingProfile, loadingPassword, loadingLimit, loadingDelete, showDeleteModal,
       profileForm, passwordForm, limitForm, deleteForm, allLimits, limitsEnabled,
-      updateProfile, updatePassword, submitLimit, deleteAccount, editLimit, deleteLimit, cancelEdit, updateLimitsToggle
+      updateProfile, updatePassword, submitLimit, deleteAccount, updateLimitsToggle
     }
   }
 }
