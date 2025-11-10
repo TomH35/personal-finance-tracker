@@ -1,15 +1,16 @@
 <template>
   <div class="bg-light min-vh-100">
-    <!-- Main Content -->
     <div class="container py-5">
       <div class="row justify-content-center">
         <div class="col-lg-8">
           <div class="card shadow-sm border-0">
             <div class="card-body p-5">
               <h2 class="text-primary mb-2">Account Settings</h2>
-              <p class="text-muted mb-5">Update your personal information, change your password, or delete your account.</p>
+              <p class="text-muted mb-5">
+                Update your personal information, change your password, manage your monthly limits, or delete your account.
+              </p>
 
-              <!-- Alert Messages -->
+              <!-- Success/Error Messages -->
               <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
                 {{ successMessage }}
                 <button type="button" class="btn-close" @click="successMessage = ''"></button>
@@ -26,23 +27,11 @@
                   <div class="row g-3">
                     <div class="col-md-6">
                       <label class="form-label">Full Name</label>
-                      <input 
-                        type="text" 
-                        v-model="profileForm.name"
-                        class="form-control" 
-                        placeholder="John Doe"
-                        required
-                      />
+                      <input type="text" v-model="profileForm.name" class="form-control" placeholder="John Doe" required />
                     </div>
                     <div class="col-md-6">
                       <label class="form-label">Email Address</label>
-                      <input 
-                        type="email" 
-                        v-model="profileForm.email"
-                        class="form-control" 
-                        placeholder="john@example.com"
-                        required
-                      />
+                      <input type="email" v-model="profileForm.email" class="form-control" placeholder="john@example.com" required />
                     </div>
                   </div>
                   <div class="text-end mt-3">
@@ -63,33 +52,15 @@
                   <div class="row g-3">
                     <div class="col-md-4">
                       <label class="form-label">Current Password</label>
-                      <input 
-                        type="password" 
-                        v-model="passwordForm.currentPassword"
-                        class="form-control" 
-                        placeholder="••••••••"
-                        required
-                      />
+                      <input type="password" v-model="passwordForm.currentPassword" class="form-control" placeholder="••••••••" required />
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">New Password</label>
-                      <input 
-                        type="password" 
-                        v-model="passwordForm.newPassword"
-                        class="form-control" 
-                        placeholder="New password"
-                        required
-                      />
+                      <input type="password" v-model="passwordForm.newPassword" class="form-control" placeholder="New password" required />
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">Confirm Password</label>
-                      <input 
-                        type="password" 
-                        v-model="passwordForm.confirmPassword"
-                        class="form-control" 
-                        placeholder="Confirm password"
-                        required
-                      />
+                      <input type="password" v-model="passwordForm.confirmPassword" class="form-control" placeholder="Confirm password" required />
                     </div>
                   </div>
                   <div class="text-end mt-3">
@@ -103,33 +74,66 @@
 
               <hr class="my-5">
 
+              <!-- Toggle Limits -->
+              <div class="mb-3">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="toggleLimits" v-model="limitsEnabled" @change="updateLimitsToggle">
+                  <label class="form-check-label" for="toggleLimits">
+                    Enable Monthly Expense Limits
+                  </label>
+                </div>
+              </div>
+
+              <!-- Monthly Expense Limits -->
+              <div v-if="limitsEnabled" class="mb-5">
+                <h5 class="fw-semibold mb-3">Monthly Expense Limits</h5>
+                <form @submit.prevent="submitLimit">
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <label class="form-label">Warning Limit</label>
+                      <input type="number" v-model="limitForm.warning_limit" class="form-control" placeholder="e.g. 500" required />
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Critical Limit</label>
+                      <input type="number" v-model="limitForm.critical_limit" class="form-control" placeholder="e.g. 1000" required />
+                    </div>
+                  </div>
+                  <div class="text-end mt-3">
+                    <button type="submit" class="btn btn-primary" :disabled="loadingLimit">
+                      <span v-if="loadingLimit" class="spinner-border spinner-border-sm me-2"></span>
+                      Save Limits
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <hr class="my-5">
+
               <!-- Danger Zone -->
               <div>
                 <h5 class="fw-semibold text-danger mb-2">Danger Zone</h5>
-                <p class="text-muted mb-3">Deleting your account is irreversible. All your data and transactions will be permanently removed.</p>
-                <button 
-                  class="btn btn-danger" 
-                  @click="showDeleteModal = true"
-                  :disabled="loadingDelete"
-                >
+                <p class="text-muted mb-3">
+                  Deleting your account is irreversible. All your data and transactions will be permanently removed.
+                </p>
+                <button class="btn btn-danger" @click="showDeleteModal = true" :disabled="loadingDelete">
                   <i class="bi bi-exclamation-triangle me-2"></i>
                   Delete Account
                 </button>
               </div>
+
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Footer -->
     <footer class="bg-primary text-white text-center py-3 mt-auto">
       <div class="container">
         <p class="mb-0">© 2025 Personal Finance Tracker · Privacy · Terms</p>
       </div>
     </footer>
 
-    <!-- Delete Confirmation Modal -->
+    <!-- Delete Modal -->
     <div class="modal fade" :class="{ 'show d-block': showDeleteModal }" tabindex="-1" v-if="showDeleteModal">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -142,22 +146,12 @@
             <p class="text-danger fw-semibold">This action cannot be undone. All your data will be permanently deleted.</p>
             <div class="mb-3">
               <label class="form-label">Enter your password to confirm:</label>
-              <input 
-                type="password" 
-                v-model="deleteForm.password"
-                class="form-control" 
-                placeholder="Your password"
-              />
+              <input type="password" v-model="deleteForm.password" class="form-control" placeholder="Your password" />
             </div>
           </div>
           <div class="modal-footer border-0">
             <button type="button" class="btn btn-secondary" @click="showDeleteModal = false">Cancel</button>
-            <button 
-              type="button" 
-              class="btn btn-danger" 
-              @click="deleteAccount"
-              :disabled="!deleteForm.password || loadingDelete"
-            >
+            <button type="button" class="btn btn-danger" @click="deleteAccount" :disabled="!deleteForm.password || loadingDelete">
               <span v-if="loadingDelete" class="spinner-border spinner-border-sm me-2"></span>
               Yes, Delete My Account
             </button>
@@ -184,148 +178,162 @@ export default {
     const errorMessage = ref('')
     const loadingProfile = ref(false)
     const loadingPassword = ref(false)
+    const loadingLimit = ref(false)
     const loadingDelete = ref(false)
     const showDeleteModal = ref(false)
 
-    const profileForm = ref({
-      name: '',
-      email: ''
-    })
+    const profileForm = ref({ name: '', email: '' })
+    const passwordForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    const limitForm = ref({ limit_id: null, warning_limit: '', critical_limit: '' })
+    const deleteForm = ref({ password: '' })
+    const allLimits = ref([])
+    const limitsEnabled = ref(false)
+    const userToggled = ref(false) // track if user clicked toggle
 
-    const passwordForm = ref({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    })
-
-    const deleteForm = ref({
-      password: ''
-    })
-
-    // Load user profile
     async function loadProfile() {
       try {
-        // TODO: Implement API call to get user profile
-        // For now, using placeholder data
         profileForm.value.name = 'John Doe'
         profileForm.value.email = 'john@example.com'
+      } catch (err) { console.error(err) }
+    }
+
+    async function loadLimits() {
+      try {
+        const res = await fetch(`/backend/api/limit-api/get-limit-api.php`, {
+          headers: { 'auth': `Bearer ${loginStore.jwt}` }
+        })
+        const data = await res.json()
+        if (data.success && data.limit && data.limit.length > 0) {
+          allLimits.value = Array.isArray(data.limit) ? data.limit : [data.limit]
+          
+          // Get the first limit (there should only be one per user)
+          const userLimit = allLimits.value[0]
+          
+          if (userLimit) {
+            // Always store the limit_id regardless of enabled status
+            limitForm.value.limit_id = userLimit.limit_id
+            
+            // Set toggle and form values based on enabled status
+            if (userLimit.enabled) {
+              limitsEnabled.value = true
+              limitForm.value.warning_limit = userLimit.warning_limit
+              limitForm.value.critical_limit = userLimit.critical_limit
+            } else {
+              limitsEnabled.value = false
+              // Keep limit_id but clear the values when disabled
+              limitForm.value.warning_limit = ''
+              limitForm.value.critical_limit = ''
+            }
+          }
+        } else {
+          // No limits exist at all - reset everything
+          limitsEnabled.value = false
+          limitForm.value = { limit_id: null, warning_limit: '', critical_limit: '' }
+        }
+      } catch (err) { console.error(err) }
+    }
+
+    async function updateLimitsToggle() {
+      userToggled.value = true
+      try {
+        // Only call the API if there's a limit_id to toggle (i.e., a limit already exists)
+        if (limitForm.value.limit_id) {
+          const res = await fetch(`/backend/api/limit-api/toggle-limit-api.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
+            body: JSON.stringify({ 
+              limit_id: limitForm.value.limit_id,
+              enabled: limitsEnabled.value ? 1 : 0 
+            })
+          })
+          const data = await res.json()
+          if (!data.success) throw new Error(data.message)
+          await loadLimits()
+        } else {
+          // No existing limit - if toggling off, just clear the form
+          if (!limitsEnabled.value) {
+            limitForm.value = { limit_id: null, warning_limit: '', critical_limit: '' }
+          }
+          // If toggling on with no existing limit, just show the form - user will create it by clicking Save Limits
+        }
       } catch (err) {
-        console.error('Failed to load profile:', err)
+        errorMessage.value = 'Failed to update toggle'
+        limitsEnabled.value = !limitsEnabled.value
+        setTimeout(()=>errorMessage.value='',3000)
       }
     }
 
-    // Update profile
+    async function submitLimit() {
+      loadingLimit.value = true
+      try {
+        const url = limitForm.value.limit_id
+          ? `/backend/api/limit-api/edit-limit-api.php`
+          : `/backend/api/limit-api/set-limit-api.php`
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
+          body: JSON.stringify({
+            ...limitForm.value,
+            enabled: 1
+          })
+        })
+        const data = await res.json()
+        if (data.success) {
+          successMessage.value = limitForm.value.limit_id ? 'Limits updated successfully!' : 'Limits saved successfully!'
+          setTimeout(()=>successMessage.value='',3000)
+          await loadLimits()
+        } else {
+          errorMessage.value = data.message
+          setTimeout(()=>errorMessage.value='',3000)
+        }
+      } catch { 
+        errorMessage.value = 'Network error'
+        setTimeout(()=>errorMessage.value='',3000)
+      }
+      finally { loadingLimit.value = false }
+    }
+
     async function updateProfile() {
       loadingProfile.value = true
       errorMessage.value = ''
       successMessage.value = ''
-
-      try {
-        // TODO: Implement API call to update profile
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
-        
-        successMessage.value = 'Profile updated successfully!'
-        setTimeout(() => successMessage.value = '', 3000)
-      } catch (err) {
-        errorMessage.value = 'Failed to update profile'
-        setTimeout(() => errorMessage.value = '', 3000)
-      } finally {
-        loadingProfile.value = false
-      }
+      try { await new Promise(r => setTimeout(r, 1000)); successMessage.value='Profile updated successfully!'; setTimeout(()=>successMessage.value='',3000) }
+      catch { errorMessage.value='Failed to update profile' }
+      finally { loadingProfile.value = false }
     }
 
-    // Update password
     async function updatePassword() {
-      if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
-        errorMessage.value = 'New passwords do not match'
-        setTimeout(() => errorMessage.value = '', 3000)
-        return
-      }
-
-      if (passwordForm.value.newPassword.length < 6) {
-        errorMessage.value = 'Password must be at least 6 characters'
-        setTimeout(() => errorMessage.value = '', 3000)
-        return
-      }
-
-      loadingPassword.value = true
-      errorMessage.value = ''
-      successMessage.value = ''
-
-      try {
-        // TODO: Implement API call to update password
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
-        
-        successMessage.value = 'Password updated successfully!'
-        passwordForm.value = {
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        }
-        setTimeout(() => successMessage.value = '', 3000)
-      } catch (err) {
-        errorMessage.value = 'Failed to update password'
-        setTimeout(() => errorMessage.value = '', 3000)
-      } finally {
-        loadingPassword.value = false
-      }
+      if(passwordForm.value.newPassword !== passwordForm.value.confirmPassword){errorMessage.value='New passwords do not match'; setTimeout(()=>errorMessage.value='',3000); return}
+      loadingPassword.value=true
+      try{await new Promise(r=>setTimeout(r,1000)); successMessage.value='Password updated successfully!'; passwordForm.value={currentPassword:'',newPassword:'',confirmPassword:''}; setTimeout(()=>successMessage.value='',3000)}
+      catch{errorMessage.value='Failed to update password'} finally{loadingPassword.value=false}
     }
 
-    // Delete account
-    async function deleteAccount() {
-      if (!deleteForm.value.password) {
-        return
-      }
-
-      loadingDelete.value = true
-      errorMessage.value = ''
-
-      try {
-        // TODO: Implement API call to delete account
-        await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
-        
-        // Logout and redirect
-        loginStore.clearJwt()
-        router.push('/user-login')
-      } catch (err) {
-        showDeleteModal.value = false
-        errorMessage.value = 'Failed to delete account'
-        setTimeout(() => errorMessage.value = '', 3000)
-      } finally {
-        loadingDelete.value = false
-      }
+    async function deleteAccount(){
+      if(!deleteForm.value.password) return
+      loadingDelete.value=true
+      try{await new Promise(r=>setTimeout(r,1000)); loginStore.clearJwt(); router.push('/user-login')}
+      catch{errorMessage.value='Failed to delete account'}
+      finally{loadingDelete.value=false}
     }
 
     onMounted(async () => {
       loginStore.loadJwt()
-      if (!loginStore.jwt) {
-        router.push('/user-login')
-        return
-      }
-
+      if(!loginStore.jwt) router.push('/user-login')
       await loadProfile()
+      await loadLimits()
     })
 
     return {
-      successMessage,
-      errorMessage,
-      loadingProfile,
-      loadingPassword,
-      loadingDelete,
-      showDeleteModal,
-      profileForm,
-      passwordForm,
-      deleteForm,
-      updateProfile,
-      updatePassword,
-      deleteAccount
+      successMessage, errorMessage, loadingProfile, loadingPassword, loadingLimit, loadingDelete, showDeleteModal,
+      profileForm, passwordForm, limitForm, deleteForm, allLimits, limitsEnabled,
+      updateProfile, updatePassword, submitLimit, deleteAccount, updateLimitsToggle
     }
   }
 }
 </script>
 
 <style scoped>
-.modal.show {
-  background-color: rgba(0, 0, 0, 0.5);
-}
+.modal.show { background-color: rgba(0, 0, 0, 0.5); }
 </style>

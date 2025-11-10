@@ -59,10 +59,9 @@ CREATE TABLE transactions (
 CREATE TABLE spending_limits (
     limit_id INT AUTO_INCREMENT PRIMARY KEY,          -- Limit ID
     user_id INT NOT NULL,                             -- Linked user
-    month INT NOT NULL,                               -- Month (1–12)
-    year INT NOT NULL,                                -- Year
-    warning_limit DECIMAL(10,2) NOT NULL,             -- Warning threshold
-    critical_limit DECIMAL(10,2) NOT NULL,            -- Critical threshold
+    warning_limit DECIMAL(10,2) NOT NULL,            -- Warning threshold
+    critical_limit DECIMAL(10,2) NOT NULL,           -- Critical threshold
+    enabled TINYINT(1) NOT NULL DEFAULT 1,           -- Whether limit is active
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
