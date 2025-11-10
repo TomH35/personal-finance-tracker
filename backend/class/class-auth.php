@@ -1,11 +1,25 @@
 <?php
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/class-db.php';
+
+use Dotenv\Dotenv;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use Firebase\JWT\ExpiredException;
+use Firebase\JWT\SignatureInvalidException;
+use Firebase\JWT\BeforeValidException;
 
 class Auth {
     private $db;
+    private $jwtSecret;
 
     public function __construct() {
         $this->db = new Db();
+        
+        // Load JWT secret from .env
+        $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
+        $dotenv->load();
+        $this->jwtSecret = $_ENV['JWT_SECRET'];
     }
 
     /**
@@ -155,11 +169,6 @@ class Auth {
                 }
             }
 
-            // Load JWT secret from .env
-            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-            $dotenv->load();
-            $jwtSecret = $_ENV['JWT_SECRET'];
-
             // Prepare JWT payload
             $issuedAt = time();
             $expirationTime = $issuedAt + (60 * 60); // valid for 1 hour
@@ -177,7 +186,7 @@ class Auth {
             ];
 
             // Generate JWT token
-            $jwt = \Firebase\JWT\JWT::encode($payload, $jwtSecret, 'HS256');
+            $jwt = JWT::encode($payload, $this->jwtSecret, 'HS256');
 
             return [
                 'success' => true,
@@ -214,11 +223,7 @@ class Auth {
      */
     public function isAdmin($jwt) {
         try {
-            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-            $dotenv->load();
-            $jwtSecret = $_ENV['JWT_SECRET'];
-
-            $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+            $decoded = JWT::decode($jwt, new Key($this->jwtSecret, 'HS256'));
 
             if (!isset($decoded->data->user_id)) {
                 return false;
@@ -237,13 +242,13 @@ class Auth {
 
             return false;
 
-        } catch (\Firebase\JWT\ExpiredException $e) {
+        } catch (ExpiredException $e) {
             error_log("JWT expired: " . $e->getMessage());
             return false;
-        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+        } catch (SignatureInvalidException $e) {
             error_log("JWT signature invalid: " . $e->getMessage());
             return false;
-        } catch (\Firebase\JWT\BeforeValidException $e) {
+        } catch (BeforeValidException $e) {
             error_log("JWT not yet valid: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
@@ -263,11 +268,7 @@ class Auth {
      */
     public function isUser($jwt) {
         try {
-            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-            $dotenv->load();
-            $jwtSecret = $_ENV['JWT_SECRET'];
-
-            $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+            $decoded = JWT::decode($jwt, new Key($this->jwtSecret, 'HS256'));
 
             if (!isset($decoded->data->user_id)) {
                 return false;
@@ -286,13 +287,13 @@ class Auth {
 
             return false;
 
-        } catch (\Firebase\JWT\ExpiredException $e) {
+        } catch (ExpiredException $e) {
             error_log("JWT expired: " . $e->getMessage());
             return false;
-        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+        } catch (SignatureInvalidException $e) {
             error_log("JWT signature invalid: " . $e->getMessage());
             return false;
-        } catch (\Firebase\JWT\BeforeValidException $e) {
+        } catch (BeforeValidException $e) {
             error_log("JWT not yet valid: " . $e->getMessage());
             return false;
         } catch (Exception $e) {
@@ -312,11 +313,7 @@ class Auth {
      */
     public function getUserId($jwt) {
         try {
-            $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/..');
-            $dotenv->load();
-            $jwtSecret = $_ENV['JWT_SECRET'];
-
-            $decoded = \Firebase\JWT\JWT::decode($jwt, new \Firebase\JWT\Key($jwtSecret, 'HS256'));
+            $decoded = JWT::decode($jwt, new Key($this->jwtSecret, 'HS256'));
 
             if (!isset($decoded->data->user_id)) {
                 error_log("JWT does not contain user_id");
@@ -325,13 +322,13 @@ class Auth {
 
             return (int)$decoded->data->user_id;
 
-        } catch (\Firebase\JWT\ExpiredException $e) {
+        } catch (ExpiredException $e) {
             error_log("JWT expired: " . $e->getMessage());
             return null;
-        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+        } catch (SignatureInvalidException $e) {
             error_log("JWT signature invalid: " . $e->getMessage());
             return null;
-        } catch (\Firebase\JWT\BeforeValidException $e) {
+        } catch (BeforeValidException $e) {
             error_log("JWT not yet valid: " . $e->getMessage());
             return null;
         } catch (Exception $e) {
