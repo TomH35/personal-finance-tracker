@@ -24,10 +24,8 @@ $type = $data['type'] ?? 'expense';
 $user_id = $auth->getUserId($jwt);
 
 if ($auth->isAdmin($jwt)) {
-    //  Admiin creates global category
     echo json_encode($categories->createCategory($name, $user_id, $type, true));
 } else {
-    // user only category
-    echo json_encode($categories->createCategory($name, $user_id, $type, false));
+    echo json_encode(['success' => false, 'message' => 'Permission denied']);
 }
 ?>
