@@ -24,12 +24,65 @@
 
           <div class="card border-0 shadow-sm">
             <div class="card-body">
+<<<<<<< Updated upstream
               <h6 class="fw-semibold mb-3">Income Categories</h6>
               <ul class="list-group list-group-flush">
                 <li v-for="cat in incomeCategories" :key="cat.id" class="list-group-item small">
                   {{ cat.name }}
                 </li>
               </ul>
+=======
+              <h6 class="fw-semibold mb-3">Categories</h6>
+              <ul class="list-group list-group-flush mb-3">
+                <li v-for="cat in categories" :key="cat.id" class="list-group-item small d-flex align-items-center justify-content-between">
+                  <div>
+                    <span>{{ cat.name }}</span>
+                    <span class="badge bg-secondary ms-2">{{ cat.type }}</span>
+                  </div>
+                  <div>
+                    <button class="btn btn-sm btn-outline-primary me-1" @click="startEditCategory(cat)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" @click="deleteCategory(cat)">Delete</button>
+                  </div>
+                </li>
+              </ul>
+
+              <!-- Edit Category Modal -->
+              <div v-if="showEditModal" class="modal fade show" tabindex="-1" style="display: block; background: rgba(0,0,0,0.3);">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title">Edit Category</h5>
+                      <button type="button" class="btn-close" @click="cancelEditCategory"></button>
+                    </div>
+                    <div class="modal-body">
+                      <input v-model="editCategoryName" class="form-control mb-2" placeholder="Category name" />
+                      <select v-model="editCategoryType" class="form-select">
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                      </select>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" @click="cancelEditCategory">Cancel</button>
+                      <button type="button" class="btn btn-primary" @click="saveEditCategory(editingCategory)">Save</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="input-group input-group-sm">
+                <input
+                  type="text"
+                  v-model="newCategory"
+                  class="form-control"
+                  placeholder="New category"
+                  @keyup.enter="addCategory"
+                />
+                <select v-model="newCategoryType" class="form-select" style="max-width: 120px;">
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+                <button class="btn btn-primary" @click="addCategory">Add</button>
+              </div>
+>>>>>>> Stashed changes
             </div>
           </div>
         </nav>
@@ -224,7 +277,9 @@
   </div>
 </template>
 
+
 <script>
+<<<<<<< Updated upstream
 import { useLoginStore } from '@/stores/loginStore'
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -455,6 +510,164 @@ export default {
       updateIncome,
       deleteIncomeItem
     }
+=======
+import { useLoginStore } from '../stores/loginStore'
+import { onMounted } from 'vue'
+
+export default {
+  name: 'UserDashboardView',
+  data() {
+    return {
+  categories: [],
+  editCategoryId: null,
+  editCategoryName: '',
+  editCategoryType: 'expense',
+  showEditModal: false,
+  editingCategory: null,
+      transactions: [],
+  newCategory: '',
+  newCategoryType: 'expense',
+      formData: {
+        desc: '',
+        amount: '',
+        category: '',
+        type: 'income',
+      },
+      loginStore: null,
+    }
+  },
+  computed: {
+    totalIncome() {
+      return this.transactions
+        .filter((t) => t.type === 'income')
+        .reduce((sum, t) => sum + t.amount, 0)
+    },
+    totalExpenses() {
+      return this.transactions
+        .filter((t) => t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0)
+    },
+    balance() {
+      return this.totalIncome - this.totalExpenses
+    },
+  },
+  methods: {
+    async addCategory() {
+      const name = this.newCategory.trim();
+      const type = this.newCategoryType;
+      const jwt = this.loginStore.jwt;
+      if (name) {
+        try {
+          const response = await fetch('http://localhost/personal-finance-tracker/backend/api/category-api/category-create-api.php', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + jwt
+            },
+            body: JSON.stringify({ name, type })
+          });
+          const result = await response.json();
+          if (result.success) {
+            this.newCategory = '';
+            this.newCategoryType = 'expense';
+            await this.fetchCategories();
+          } else {
+            alert(result.message || 'Failed to add category');
+          }
+        } catch (error) {
+          console.error('Error adding category:', error);
+          alert('Error adding category');
+        }
+      }
+    },
+
+    startEditCategory(cat) {
+      this.editCategoryId = cat.id;
+      this.editCategoryName = cat.name;
+      this.editCategoryType = cat.type;
+      this.showEditModal = true;
+      this.editingCategory = cat;
+    },
+    cancelEditCategory() {
+      this.editCategoryId = null;
+      this.editCategoryName = '';
+      this.editCategoryType = 'expense';
+      this.showEditModal = false;
+      this.editingCategory = null;
+    },
+    async saveEditCategory(cat) {
+      const jwt = this.loginStore.jwt;
+      try {
+        const response = await fetch('http://localhost/personal-finance-tracker/backend/api/category-api/category-edit-api.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + jwt
+          },
+          body: JSON.stringify({ id: cat.id, name: this.editCategoryName, type: this.editCategoryType })
+        });
+        const result = await response.json();
+        if (result.success) {
+          this.cancelEditCategory();
+          await this.fetchCategories();
+        } else {
+          alert(result.message || 'Failed to update category');
+        }
+      } catch (error) {
+        console.error('Error updating category:', error);
+        alert('Error updating category');
+      }
+    },
+    async deleteCategory(cat) {
+      if (!confirm('Are you sure you want to delete this category?')) return;
+      const jwt = this.loginStore.jwt;
+      try {
+        const response = await fetch('http://localhost/personal-finance-tracker/backend/api/category-api/category-delete-api.php', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + jwt
+          },
+          body: JSON.stringify({ id: cat.id })
+        });
+        const result = await response.json();
+        if (result.success) {
+          await this.fetchCategories();
+        } else {
+          alert(result.message || 'Failed to delete category');
+        }
+      } catch (error) {
+        console.error('Error deleting category:', error);
+        alert('Error deleting category');
+      }
+    },
+
+    async fetchCategories() {
+      const jwt = this.loginStore.jwt;
+      try {
+        const response = await fetch('http://localhost/personal-finance-tracker/backend/api/category-api/category-get-all-api.php', {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer ' + jwt
+          }
+        });
+        const result = await response.json();
+        if (result.success && Array.isArray(result.categories)) {
+          this.categories = result.categories;
+        } else {
+          this.categories = [];
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        this.categories = [];
+      }
+    },
+  },
+  mounted() {
+    this.loginStore = useLoginStore();
+    this.loginStore.loadJwt();
+    this.fetchCategories();
+>>>>>>> Stashed changes
   }
 }
 </script>

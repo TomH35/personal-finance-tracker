@@ -171,7 +171,7 @@ class Auth {
 
             // Prepare JWT payload
             $issuedAt = time();
-            $expirationTime = $issuedAt + (60 * 60); // valid for 1 hour
+            $expirationTime = $issuedAt + (60 * 60 * 24); // valid for 24 hours
 
             $payload = [
                 'iat' => $issuedAt,
@@ -316,12 +316,13 @@ class Auth {
             $decoded = JWT::decode($jwt, new Key($this->jwtSecret, 'HS256'));
 
             if (!isset($decoded->data->user_id)) {
-                error_log("JWT does not contain user_id");
+                file_put_contents(__DIR__ . '/../debug.log', date('Y-m-d H:i:s') . " | JWT does not contain user_id\n", FILE_APPEND);
                 return null;
             }
 
             return (int)$decoded->data->user_id;
 
+<<<<<<< Updated upstream
         } catch (ExpiredException $e) {
             error_log("JWT expired: " . $e->getMessage());
             return null;
@@ -330,10 +331,39 @@ class Auth {
             return null;
         } catch (BeforeValidException $e) {
             error_log("JWT not yet valid: " . $e->getMessage());
+=======
+            $pdo = $this->db->getPdo();
+            $stmt = $pdo->prepare("SELECT user_id FROM users WHERE user_id = :user_id LIMIT 1");
+            $stmt->execute(['user_id' => $userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                file_put_contents(__DIR__ . '/../debug.log', date('Y-m-d H:i:s') . " | User with ID $userId does not exist in database\n", FILE_APPEND);
+                return null;
+            }
+
+            file_put_contents(__DIR__ . '/../debug.log', date('Y-m-d H:i:s') . " | getUserId returns: $userId\n", FILE_APPEND);
+            return (int)$user['user_id'];
+
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            file_put_contents(__DIR__ . '/../debug.log', date('Y-m-d H:i:s') . " | JWT expired: " . $e->getMessage() . "\n", FILE_APPEND);
+            return null;
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            file_put_contents(__DIR__ . '/../debug.log', date('Y-m-d H:i:s') . " | JWT signature invalid: " . $e->getMessage() . "\n", FILE_APPEND);
+            return null;
+        } catch (\Firebase\JWT\BeforeValidException $e) {
+            file_put_contents(__DIR__ . '/../debug.log', date('Y-m-d H:i:s') . " | JWT not yet valid: " . $e->getMessage() . "\n", FILE_APPEND);
+>>>>>>> Stashed changes
             return null;
         } catch (Exception $e) {
-            error_log("JWT verification error: " . $e->getMessage());
+            file_put_contents(__DIR__ . '/../debug.log', date('Y-m-d H:i:s') . " | JWT verification error: " . $e->getMessage() . "\n", FILE_APPEND);
             return null;
+<<<<<<< Updated upstream
+=======
+        } catch (PDOException $e) {
+            file_put_contents(__DIR__ . '/../debug.log', date('Y-m-d H:i:s') . " | Database error in getUserId: " . $e->getMessage() . "\n", FILE_APPEND);
+            return null;
+>>>>>>> Stashed changes
         }
     }
 }

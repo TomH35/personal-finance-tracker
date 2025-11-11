@@ -30,6 +30,7 @@ class Categories {
         try {
             $pdo = $this->db->getPdo();
 
+
             if (empty($name)) {
                 return ['success' => false, 'message' => 'Category name is required'];
             }
