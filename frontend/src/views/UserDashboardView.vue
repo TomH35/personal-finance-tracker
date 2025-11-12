@@ -335,6 +335,53 @@
         </div>
       </div>
     </div>
+
+    <!-- Warning Limit Modal -->
+    <div class="modal fade" id="limitWarningModal" tabindex="-1" aria-labelledby="limitWarningModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content border-warning">
+          <div class="modal-header bg-warning bg-opacity-10">
+            <h5 class="modal-title text-warning" id="limitWarningModalLabel">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>Upozornenie: Mesačný limit
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">Prekročili ste varovný mesačný limit výdavkov!</p>
+            <div class="alert alert-warning mb-0">
+              <strong>Varovný limit:</strong> ${{ warningLimit.toFixed(2) }}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Rozumiem</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Critical Limit Modal -->
+    <div class="modal fade" id="limitCriticalModal" tabindex="-1" aria-labelledby="limitCriticalModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content border-danger">
+          <div class="modal-header bg-danger bg-opacity-10">
+            <h5 class="modal-title text-danger" id="limitCriticalModalLabel">
+              <i class="bi bi-x-octagon-fill me-2"></i>Kritické: Prekročený limit
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">Prekročili ste kritický mesačný limit výdavkov!</p>
+            <div class="alert alert-danger mb-0">
+              <strong>Kritický limit:</strong> ${{ criticalLimit.toFixed(2) }}<br>
+              <strong class="text-danger">Skontrolujte svoje výdavky!</strong>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Rozumiem</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -374,6 +421,10 @@ export default {
       name: '',
       type: 'income'
     })
+    const limits = ref([])
+    const warningLimit = ref(0)
+    const criticalLimit = ref(0)
+    const limitsEnabled = ref(false)
 
     // Computed
     const incomeCategories = computed(() => {
@@ -385,6 +436,41 @@ export default {
     })
 
     // API Methods
+    async function loadLimits() {
+      try {
+        const response = await fetch('/backend/api/limit-api/get-limit-api.php', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}`
+          }
+        })
+        const data = await response.json()
+        if (data.success && data.limit && data.limit.length > 0) {
+          limits.value = data.limit
+          // Get the most recent active limit
+          const activeLimit = data.limit.find(l => l.enabled == 1) || data.limit[0]
+          warningLimit.value = parseFloat(activeLimit.warning_limit || 0)
+          criticalLimit.value = parseFloat(activeLimit.critical_limit || 0)
+          limitsEnabled.value = activeLimit.enabled == 1
+        }
+      } catch (err) {
+        console.error('Failed to load limits:', err)
+      }
+    }
+
+    function checkLimits(monthlyExpenses) {
+      if (!limitsEnabled.value) return
+      
+      if (monthlyExpenses >= criticalLimit.value && criticalLimit.value > 0) {
+        const modal = new window.bootstrap.Modal(document.getElementById('limitCriticalModal'))
+        modal.show()
+      } else if (monthlyExpenses >= warningLimit.value && warningLimit.value > 0) {
+        const modal = new window.bootstrap.Modal(document.getElementById('limitWarningModal'))
+        modal.show()
+      }
+    }
+
     async function loadIncome() {
       loading.value = true
       try {
@@ -696,6 +782,7 @@ export default {
 
       await loadCategories()
       await loadIncome()
+      await loadLimits()
     })
 
     return {
@@ -723,7 +810,13 @@ export default {
       openEditCategoryModal,
       updateCategory,
       openDeleteCategoryModal,
-      confirmDeleteCategory
+      confirmDeleteCategory,
+      // Limit-related data and functions
+      limits,
+      warningLimit,
+      criticalLimit,
+      limitsEnabled,
+      checkLimits
     }
   }
 }
