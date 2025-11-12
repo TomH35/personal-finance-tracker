@@ -96,4 +96,29 @@ class User
             ];
         }
     }
+
+    public function deleteOwnAccount($user_id)
+    {
+        try {
+            $stmt = $this->db->prepare("DELETE FROM users WHERE user_id = :user_id");
+            $stmt->execute(['user_id' => $user_id]);
+
+            if ($stmt->rowCount() === 0) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found'
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Account deleted successfully'
+            ];
+        } catch (PDOException $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to delete account: ' . $e->getMessage()
+            ];
+        }
+    }
 }
