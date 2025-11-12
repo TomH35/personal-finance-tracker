@@ -24,12 +24,24 @@
 
           <div class="card border-0 shadow-sm">
             <div class="card-body">
-              <h6 class="fw-semibold mb-3">Income Categories</h6>
-              <ul class="list-group list-group-flush">
-                <li v-for="cat in incomeCategories" :key="cat.id" class="list-group-item small">
-                  {{ cat.name }}
+              <h6 class="fw-semibold mb-3">Categories</h6>
+              <ul class="list-group list-group-flush mb-3">
+                <li 
+                  v-for="cat in categories" 
+                  :key="cat.id" 
+                  class="list-group-item small d-flex justify-content-between align-items-center"
+                >
+                  <div>
+                    <span>{{ cat.name }}</span>
+                    <span class="badge ms-2" :class="cat.type === 'income' ? 'bg-success' : 'bg-danger'">{{ cat.type }}</span>
+                  </div>
+                  <div v-if="!cat.is_predefined">
+                    <button class="btn btn-sm btn-outline-primary me-1" @click="openEditCategoryModal(cat)">Edit</button>
+                    <button class="btn btn-sm btn-outline-danger" @click="openDeleteCategoryModal(cat)">Delete</button>
+                  </div>
                 </li>
               </ul>
+              <button class="btn btn-primary btn-sm w-100" @click="openCreateCategoryModal">Create Category</button>
             </div>
           </div>
         </nav>
@@ -221,6 +233,108 @@
         </div>
       </div>
     </div>
+
+    <!-- Create Category Modal -->
+    <div class="modal fade" id="createCategoryModal" tabindex="-1" aria-labelledby="createCategoryModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="createCategoryModalLabel">Create Category</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form @submit.prevent="saveNewCategory">
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Category Name</label>
+                <input
+                  type="text"
+                  v-model="newCategory"
+                  class="form-control"
+                  placeholder="Category name"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Type</label>
+                <select v-model="newCategoryType" class="form-select" required>
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Category Modal -->
+    <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editCategoryModalLabel">Edit Category</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <form @submit.prevent="updateCategory">
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Category Name</label>
+                <input
+                  type="text"
+                  v-model="editCategoryData.name"
+                  class="form-control"
+                  placeholder="Category name"
+                  required
+                />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Type</label>
+                <select v-model="editCategoryData.type" class="form-select" required>
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Category Modal -->
+    <div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-labelledby="deleteCategoryModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="deleteCategoryModalLabel">Delete Category</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            Are you sure you want to delete the category "{{ editCategoryData.name }}"?
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger" @click="confirmDeleteCategory" :disabled="loading">
+              <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -252,6 +366,13 @@ export default {
       category_id: '',
       note: '',
       date: ''
+    })
+    const newCategory = ref('')
+    const newCategoryType = ref('income')
+    const editCategoryData = ref({
+      id: null,
+      name: '',
+      type: 'income'
     })
 
     // Computed
@@ -426,6 +547,145 @@ export default {
       }
     }
 
+    async function addCategory() {
+      const name = newCategory.value.trim()
+      const type = newCategoryType.value
+      
+      if (!name) {
+        errorMessage.value = 'Category name is required'
+        setTimeout(() => errorMessage.value = '', 3000)
+        return
+      }
+
+      loading.value = true
+      try {
+        const response = await fetch('/backend/api/custom-categories-api/custom-category-create-api.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}`
+          },
+          body: JSON.stringify({ name, type })
+        })
+        const data = await response.json()
+
+        if (data.success) {
+          successMessage.value = 'Category added successfully!'
+          newCategory.value = ''
+          newCategoryType.value = 'income'
+          await loadCategories()
+          setTimeout(() => successMessage.value = '', 3000)
+        } else {
+          errorMessage.value = data.message || 'Failed to add category'
+          setTimeout(() => errorMessage.value = '', 3000)
+        }
+      } catch (err) {
+        errorMessage.value = 'Failed to add category'
+        setTimeout(() => errorMessage.value = '', 3000)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    function openCreateCategoryModal() {
+      newCategory.value = ''
+      newCategoryType.value = 'income'
+      const modal = new window.bootstrap.Modal(document.getElementById('createCategoryModal'))
+      modal.show()
+    }
+
+    async function saveNewCategory() {
+      await addCategory()
+      const modal = window.bootstrap.Modal.getInstance(document.getElementById('createCategoryModal'))
+      if (modal) modal.hide()
+    }
+
+    function openEditCategoryModal(cat) {
+      editCategoryData.value = {
+        id: cat.id,
+        name: cat.name,
+        type: cat.type
+      }
+      const modal = new window.bootstrap.Modal(document.getElementById('editCategoryModal'))
+      modal.show()
+    }
+
+    async function updateCategory() {
+      loading.value = true
+      try {
+        const response = await fetch('/backend/api/custom-categories-api/custom-category-edit-api.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}`
+          },
+          body: JSON.stringify({
+            id: editCategoryData.value.id,
+            name: editCategoryData.value.name,
+            type: editCategoryData.value.type
+          })
+        })
+        const data = await response.json()
+
+        if (data.success) {
+          successMessage.value = 'Category updated successfully!'
+          const modal = window.bootstrap.Modal.getInstance(document.getElementById('editCategoryModal'))
+          modal.hide()
+          await loadCategories()
+          setTimeout(() => successMessage.value = '', 3000)
+        } else {
+          errorMessage.value = data.message || 'Failed to update category'
+          setTimeout(() => errorMessage.value = '', 3000)
+        }
+      } catch (err) {
+        errorMessage.value = 'Failed to update category'
+        setTimeout(() => errorMessage.value = '', 3000)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    function openDeleteCategoryModal(cat) {
+      editCategoryData.value = {
+        id: cat.id,
+        name: cat.name,
+        type: cat.type
+      }
+      const modal = new window.bootstrap.Modal(document.getElementById('deleteCategoryModal'))
+      modal.show()
+    }
+
+    async function confirmDeleteCategory() {
+      loading.value = true
+      try {
+        const response = await fetch('/backend/api/custom-categories-api/custom-category-delete-api.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}`
+          },
+          body: JSON.stringify({ id: editCategoryData.value.id })
+        })
+        const data = await response.json()
+
+        if (data.success) {
+          successMessage.value = 'Category deleted successfully!'
+          const modal = window.bootstrap.Modal.getInstance(document.getElementById('deleteCategoryModal'))
+          modal.hide()
+          await loadCategories()
+          setTimeout(() => successMessage.value = '', 3000)
+        } else {
+          errorMessage.value = data.message || 'Failed to delete category'
+          setTimeout(() => errorMessage.value = '', 3000)
+        }
+      } catch (err) {
+        errorMessage.value = 'Failed to delete category'
+        setTimeout(() => errorMessage.value = '', 3000)
+      } finally {
+        loading.value = false
+      }
+    }
+
     // Load data on mount
     onMounted(async () => {
       loginStore.loadJwt()
@@ -447,13 +707,23 @@ export default {
       editingId,
       formData,
       editFormData,
+      newCategory,
+      newCategoryType,
+      editCategoryData,
       incomeCategories,
       totalIncome,
       loadIncome,
       addIncome,
       editIncomeItem,
       updateIncome,
-      deleteIncomeItem
+      deleteIncomeItem,
+      addCategory,
+      openCreateCategoryModal,
+      saveNewCategory,
+      openEditCategoryModal,
+      updateCategory,
+      openDeleteCategoryModal,
+      confirmDeleteCategory
     }
   }
 }
