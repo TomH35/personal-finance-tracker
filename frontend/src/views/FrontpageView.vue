@@ -13,7 +13,7 @@
                 Track expenses, plan budgets, and visualize your financial goals — all in one place.
               </p>
               <div class="mb-4">
-                <a class="btn btn-primary btn-lg me-2" href="#">Get Started</a>
+                <router-link to="/user-registration" class="btn btn-primary btn-lg me-2">Get Started</router-link>
                 <a class="btn btn-outline-secondary btn-lg" href="#features">Learn More</a>
               </div>
               <div>
