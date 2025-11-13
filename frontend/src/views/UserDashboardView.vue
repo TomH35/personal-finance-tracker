@@ -335,6 +335,52 @@
         </div>
       </div>
     </div>
+
+    <!-- Limit Warning Modal -->
+    <div class="modal fade" id="limitWarningModal" tabindex="-1" aria-labelledby="limitWarningModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content border-warning">
+          <div class="modal-header bg-warning text-dark">
+            <h5 class="modal-title" id="limitWarningModalLabel">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>Warning - Approaching Limit
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-0">
+              Your monthly expenses are approaching the warning limit of <strong>${{ warningLimit }}</strong>.
+              We recommend monitoring your expenses and considering reducing them.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-warning" data-bs-dismiss="modal">I Understand</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limit Critical Modal -->
+    <div class="modal fade" id="limitCriticalModal" tabindex="-1" aria-labelledby="limitCriticalModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content border-danger">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title" id="limitCriticalModalLabel">
+              <i class="bi bi-x-circle-fill me-2"></i>Critical - Limit Exceeded!
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-0">
+              <strong>Warning!</strong> Your monthly expenses have exceeded the critical limit of <strong>${{ criticalLimit }}</strong>.
+              We strongly recommend reviewing your expenses immediately!
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-danger" data-bs-dismiss="modal">I Understand</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -355,6 +401,13 @@ export default {
     const successMessage = ref('')
     const errorMessage = ref('')
     const editingId = ref(null)
+
+    // Limit state
+    const limits = ref(null)
+    const warningLimit = ref(0)
+    const criticalLimit = ref(0)
+    const limitsEnabled = ref(false)
+
     const formData = ref({
       amount: '',
       category_id: '',
@@ -421,6 +474,39 @@ export default {
         }
       } catch (err) {
         console.error('Failed to load categories:', err)
+      }
+    }
+
+    async function loadLimits() {
+      try {
+        const response = await fetch('/backend/api/limit-api/get-limit-api.php', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}`
+          }
+        })
+        const data = await response.json()
+        if (data.success && data.limit) {
+          limits.value = data.limit
+          warningLimit.value = parseFloat(data.limit.warning_limit) || 0
+          criticalLimit.value = parseFloat(data.limit.critical_limit) || 0
+          limitsEnabled.value = data.limit.enabled === '1' || data.limit.enabled === 1
+        }
+      } catch (err) {
+        console.error('Failed to load limits:', err)
+      }
+    }
+
+    function checkLimits(monthlyExpenses) {
+      if (!limitsEnabled.value) return
+
+      if (monthlyExpenses >= criticalLimit.value) {
+        const modal = new window.bootstrap.Modal(document.getElementById('limitCriticalModal'))
+        modal.show()
+      } else if (monthlyExpenses >= warningLimit.value) {
+        const modal = new window.bootstrap.Modal(document.getElementById('limitWarningModal'))
+        modal.show()
       }
     }
 
@@ -696,6 +782,7 @@ export default {
 
       await loadCategories()
       await loadIncome()
+      await loadLimits()
     })
 
     return {
@@ -712,11 +799,17 @@ export default {
       editCategoryData,
       incomeCategories,
       totalIncome,
+      limits,
+      warningLimit,
+      criticalLimit,
+      limitsEnabled,
       loadIncome,
       addIncome,
       editIncomeItem,
       updateIncome,
       deleteIncomeItem,
+      loadLimits,
+      checkLimits,
       addCategory,
       openCreateCategoryModal,
       saveNewCategory,
