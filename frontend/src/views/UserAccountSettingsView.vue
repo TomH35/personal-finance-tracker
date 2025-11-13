@@ -313,8 +313,35 @@ export default {
     async function deleteAccount(){
       if(!deleteForm.value.password) return
       loadingDelete.value=true
-      try{await new Promise(r=>setTimeout(r,1000)); loginStore.clearJwt(); router.push('/user-login')}
-      catch{errorMessage.value='Failed to delete account'}
+      errorMessage.value = ''
+      successMessage.value = ''
+      try{
+        const res = await fetch('/backend/api/user-api/user-delete-own-account-api.php', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Auth': `Bearer ${loginStore.jwt}` 
+          }
+        })
+        const data = await res.json()
+        
+        if (data.success) {
+          successMessage.value = 'Account deleted successfully. Redirecting...'
+          setTimeout(() => {
+            loginStore.clearJwt()
+            router.push('/')
+          }, 1500)
+        } else {
+          errorMessage.value = data.message || 'Failed to delete account'
+          showDeleteModal.value = false
+          setTimeout(() => errorMessage.value = '', 3000)
+        }
+      }
+      catch(err){
+        errorMessage.value = 'Network error. Failed to delete account'
+        showDeleteModal.value = false
+        setTimeout(() => errorMessage.value = '', 3000)
+      }
       finally{loadingDelete.value=false}
     }
 
