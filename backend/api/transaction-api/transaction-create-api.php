@@ -1,10 +1,10 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET');
+header('Access-Control-Allow-Methods: POST');
 header('Access-Control-Allow-Headers: Content-Type, Auth');
 
-require_once __DIR__ . '/../../class/class-income.php';
+require_once __DIR__ . '/../../class/class-transactions.php';
 require_once __DIR__ . '/../../class/class-auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -13,8 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $auth = new Auth();
-$income = new Income();
+$transactions = new Transactions();
 
+$data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 
 if (!$auth->isUser($jwt)) {
@@ -24,9 +25,11 @@ if (!$auth->isUser($jwt)) {
 }
 
 $user_id = $auth->getUserId($jwt);
-$start_date = $_GET['start_date'] ?? null;
-$end_date = $_GET['end_date'] ?? null;
-$category_id = $_GET['category_id'] ?? null;
+$amount = $data['amount'] ?? null;
+$category_id = $data['category_id'] ?? null;
+$note = $data['note'] ?? null;
+$date = $data['date'] ?? null;
+$type = $data['type'] ?? 'income';
 
-echo json_encode($income->getAllIncome($user_id, $start_date, $end_date, $category_id));
+echo json_encode($transactions->createTransaction($user_id, $amount, $category_id, $note, $date, $type));
 ?>

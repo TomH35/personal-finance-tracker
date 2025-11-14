@@ -13,10 +13,10 @@
                   Income <span class="badge bg-success">${{ totalIncome.toFixed(2) }}</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
-                  Expenses <span class="badge bg-danger">$0.00</span>
+                  Expenses <span class="badge bg-danger">${{ totalExpenses.toFixed(2) }}</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
-                  Balance <span class="badge bg-primary">${{ totalIncome.toFixed(2) }}</span>
+                  Balance <span class="badge" :class="balance >= 0 ? 'bg-primary' : 'bg-warning'">${{ balance.toFixed(2) }}</span>
                 </li>
               </ul>
             </div>
@@ -60,13 +60,19 @@
             <button type="button" class="btn-close" @click="errorMessage = ''"></button>
           </div>
 
-          <!-- Add Income -->
+          <!-- Add Transaction -->
           <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
-              <h6 class="fw-semibold mb-3">Add Income</h6>
-              <form @submit.prevent="addIncome()">
+              <h6 class="fw-semibold mb-3">Add Transaction</h6>
+              <form @submit.prevent="addTransaction()">
                 <div class="row g-2">
-                  <div class="col-md-3">
+                  <div class="col-md-2">
+                    <select v-model="formData.type" class="form-select" required>
+                      <option value="income">Income</option>
+                      <option value="expense">Expense</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
                     <input
                       type="number"
                       v-model="formData.amount"
@@ -79,12 +85,12 @@
                   <div class="col-md-3">
                     <select v-model="formData.category_id" class="form-select" required>
                       <option value="">Select Category</option>
-                      <option v-for="cat in incomeCategories" :key="cat.id" :value="cat.id">
+                      <option v-for="cat in filteredCategories" :key="cat.id" :value="cat.id">
                         {{ cat.name }}
                       </option>
                     </select>
                   </div>
-                  <div class="col-md-3">
+                  <div class="col-md-2">
                     <input
                       type="date"
                       v-model="formData.date"
@@ -103,7 +109,7 @@
                   <div class="col-12 mt-3">
                     <button class="btn btn-primary" :disabled="loading">
                       <span v-if="loading">Adding...</span>
-                      <span v-else>Add Income</span>
+                      <span v-else>Add Transaction</span>
                     </button>
                   </div>
                 </div>
@@ -111,12 +117,12 @@
             </div>
           </div>
 
-          <!-- Income Transactions -->
+          <!-- Transactions -->
           <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-semibold mb-0">Recent Income</h6>
-                <button class="btn btn-sm btn-outline-primary" @click="loadIncome">
+                <h6 class="fw-semibold mb-0">Recent Transactions</h6>
+                <button class="btn btn-sm btn-outline-primary" @click="loadAllTransactions">
                   <i class="bi bi-arrow-clockwise"></i> Refresh
                 </button>
               </div>
@@ -125,13 +131,14 @@
                   <span class="visually-hidden">Loading...</span>
                 </div>
               </div>
-              <div v-else-if="incomeList.length === 0" class="text-center py-4 text-muted">
-                No income transactions yet. Add your first income above!
+              <div v-else-if="allTransactions.length === 0" class="text-center py-4 text-muted">
+                No transactions yet. Add your first transaction above!
               </div>
               <div v-else class="table-responsive">
                 <table class="table table-hover align-middle">
                   <thead class="table-primary">
                     <tr>
+                      <th>Type</th>
                       <th>Date</th>
                       <th>Category</th>
                       <th>Note</th>
@@ -140,24 +147,29 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="income in incomeList" :key="income.id">
-                      <td>{{ income.date }}</td>
-                      <td>{{ income.category_name }}</td>
-                      <td>{{ income.note || '-' }}</td>
-                      <td class="text-end text-success fw-bold">
-                        +${{ parseFloat(income.amount).toFixed(2) }}
+                    <tr v-for="transaction in allTransactions" :key="transaction.id">
+                      <td>
+                        <span class="badge" :class="transaction.type === 'income' ? 'bg-success' : 'bg-danger'">
+                          {{ transaction.type === 'income' ? 'Income' : 'Expense' }}
+                        </span>
+                      </td>
+                      <td>{{ transaction.date }}</td>
+                      <td>{{ transaction.category_name }}</td>
+                      <td>{{ transaction.note || '-' }}</td>
+                      <td class="text-end fw-bold" :class="transaction.type === 'income' ? 'text-success' : 'text-danger'">
+                        {{ transaction.type === 'income' ? '+' : '-' }}${{ parseFloat(transaction.amount).toFixed(2) }}
                       </td>
                       <td class="text-end">
                         <button 
                           class="btn btn-sm btn-warning me-2" 
-                          @click="editIncomeItem(income)"
+                          @click="editTransaction(transaction)"
                           :disabled="loading"
                         >
                           Edit
                         </button>
                         <button 
                           class="btn btn-sm btn-danger" 
-                          @click="deleteIncomeItem(income.id)"
+                          @click="deleteTransaction(transaction.id, transaction.type)"
                           :disabled="loading"
                         >
                           Delete
@@ -173,16 +185,23 @@
       </div>
     </div>
 
-    <!-- Edit Income Modal -->
+    <!-- Edit Transaction Modal -->
     <div class="modal fade" id="editIncomeModal" tabindex="-1" aria-labelledby="editIncomeModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="editIncomeModalLabel">Edit Income</h5>
+            <h5 class="modal-title" id="editIncomeModalLabel">Edit Transaction</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
-          <form @submit.prevent="updateIncome">
+          <form @submit.prevent="updateTransaction">
             <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Type</label>
+                <select v-model="editFormData.type" class="form-select" required>
+                  <option value="income">Income</option>
+                  <option value="expense">Expense</option>
+                </select>
+              </div>
               <div class="mb-3">
                 <label class="form-label">Amount</label>
                 <input
@@ -198,7 +217,7 @@
                 <label class="form-label">Category</label>
                 <select v-model="editFormData.category_id" class="form-select" required>
                   <option value="">Select Category</option>
-                  <option v-for="cat in incomeCategories" :key="cat.id" :value="cat.id">
+                  <option v-for="cat in editFilteredCategories" :key="cat.id" :value="cat.id">
                     {{ cat.name }}
                   </option>
                 </select>
@@ -226,7 +245,7 @@
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
               <button type="submit" class="btn btn-primary" :disabled="loading">
                 <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
-                Update Income
+                Update Transaction
               </button>
             </div>
           </form>
@@ -396,6 +415,8 @@ export default {
     const router = useRouter()
 
     const incomeList = ref([])
+    const expenseList = ref([])
+    const allTransactions = ref([])
     const categories = ref([])
     const loading = ref(false)
     const successMessage = ref('')
@@ -409,12 +430,14 @@ export default {
     const limitsEnabled = ref(false)
 
     const formData = ref({
+      type: 'income',
       amount: '',
       category_id: '',
       note: '',
       date: new Date().toISOString().split('T')[0]
     })
     const editFormData = ref({
+      type: 'income',
       amount: '',
       category_id: '',
       note: '',
@@ -432,16 +455,66 @@ export default {
     const incomeCategories = computed(() => {
       return categories.value.filter(cat => cat.type === 'income')
     })
+
+    const filteredCategories = computed(() => {
+      return categories.value.filter(cat => cat.type === formData.value.type)
+    })
+
+    const editFilteredCategories = computed(() => {
+      return categories.value.filter(cat => cat.type === editFormData.value.type)
+    })
     
     const totalIncome = computed(() => {
       return incomeList.value.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
     })
 
+    const totalExpenses = computed(() => {
+      return expenseList.value.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+    })
+
+    const balance = computed(() => {
+      return totalIncome.value - totalExpenses.value
+    })
+
     // API Methods
-    async function loadIncome() {
+    async function loadAllTransactions() {
       loading.value = true
       try {
-        const response = await fetch('/backend/api/income-api/income-get-all-api.php', {
+        // Load all transactions in a single call
+        const response = await fetch('/backend/api/transaction-api/transaction-get-all-api.php', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}`
+          }
+        })
+        const data = await response.json()
+        
+        if (data.success) {
+          const transactions = data.transactions || []
+          
+          // Separate income and expenses
+          incomeList.value = transactions.filter(t => t.type === 'income')
+          expenseList.value = transactions.filter(t => t.type === 'expense')
+          
+          // Sort all transactions by date
+          allTransactions.value = transactions.sort((a, b) => {
+            const dateCompare = new Date(b.date) - new Date(a.date)
+            if (dateCompare !== 0) return dateCompare
+            return b.id - a.id
+          })
+        }
+      } catch (err) {
+        console.error('Failed to load transactions:', err)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    async function loadTransactions() {
+      loading.value = true
+      try {
+        const response = await fetch('/backend/api/transaction-api/transaction-get-all-api.php', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -510,16 +583,17 @@ export default {
       }
     }
 
-    async function addIncome() {
+    async function addTransaction() {
       loading.value = true
       try {
-        const response = await fetch('/backend/api/income-api/income-create-api.php', {
+        const response = await fetch('/backend/api/transaction-api/transaction-create-api.php', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Auth': `Bearer ${loginStore.jwt}`
           },
           body: JSON.stringify({
+            type: formData.value.type,
             amount: formData.value.amount,
             category_id: formData.value.category_id,
             note: formData.value.note || null,
@@ -529,33 +603,79 @@ export default {
         const data = await response.json()
 
         if (data.success) {
-          successMessage.value = 'Income added successfully!'
+          successMessage.value = 'Transaction added successfully!'
           formData.value = {
+            type: 'income',
             amount: '',
             category_id: '',
             note: '',
             date: new Date().toISOString().split('T')[0]
           }
-          await loadIncome()
+          await loadAllTransactions()
           setTimeout(() => successMessage.value = '', 3000)
         } else {
-          errorMessage.value = data.message || 'Failed to add income'
+          errorMessage.value = data.message || 'Failed to add transaction'
           setTimeout(() => errorMessage.value = '', 3000)
         }
       } catch (err) {
-        errorMessage.value = 'Failed to add income'
+        errorMessage.value = 'Failed to add transaction'
         setTimeout(() => errorMessage.value = '', 3000)
       } finally {
         loading.value = false
       }
     }
 
-    async function deleteIncomeItem(id) {
-      if (!confirm('Are you sure you want to delete this income?')) return
+    async function deleteTransaction(id, type) {
+      if (!confirm('Are you sure you want to delete this transaction?')) return
 
       loading.value = true
       try {
-        const response = await fetch('/backend/api/income-api/income-delete-api.php', {
+        const response = await fetch('/backend/api/transaction-api/transaction-delete-api.php', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}`
+          },
+          body: JSON.stringify({ id, type })
+        })
+        const data = await response.json()
+
+        if (data.success) {
+          successMessage.value = 'Transaction deleted successfully!'
+          await loadAllTransactions()
+          setTimeout(() => successMessage.value = '', 3000)
+        } else {
+          errorMessage.value = data.message || 'Failed to delete transaction'
+          setTimeout(() => errorMessage.value = '', 3000)
+        }
+      } catch (err) {
+        errorMessage.value = 'Failed to delete transaction'
+        setTimeout(() => errorMessage.value = '', 3000)
+      } finally {
+        loading.value = false
+      }
+    }
+
+    function editTransaction(transaction) {
+      editingId.value = transaction.id
+      editFormData.value = {
+        type: transaction.type,
+        amount: transaction.amount,
+        category_id: transaction.category_id,
+        note: transaction.note || '',
+        date: transaction.date
+      }
+      // Open Bootstrap modal
+      const modal = new window.bootstrap.Modal(document.getElementById('editIncomeModal'))
+      modal.show()
+    }
+
+    async function deleteTransactionItem(id) {
+      if (!confirm('Are you sure you want to delete this transaction?')) return
+
+      loading.value = true
+      try {
+        const response = await fetch('/backend/api/transaction-api/transaction-delete-api.php', {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -566,38 +686,39 @@ export default {
         const data = await response.json()
 
         if (data.success) {
-          successMessage.value = 'Income deleted successfully!'
-          await loadIncome()
+          successMessage.value = 'Transaction deleted successfully!'
+          await loadTransactions()
           setTimeout(() => successMessage.value = '', 3000)
         } else {
-          errorMessage.value = data.message || 'Failed to delete income'
+          errorMessage.value = data.message || 'Failed to delete transaction'
           setTimeout(() => errorMessage.value = '', 3000)
         }
       } catch (err) {
-        errorMessage.value = 'Failed to delete income'
+        errorMessage.value = 'Failed to delete transaction'
         setTimeout(() => errorMessage.value = '', 3000)
       } finally {
         loading.value = false
       }
     }
 
-    function editIncomeItem(income) {
-      editingId.value = income.id
+    function editTransactionItem(transaction) {
+      editingId.value = transaction.id
       editFormData.value = {
-        amount: income.amount,
-        category_id: income.category_id,
-        note: income.note || '',
-        date: income.date
+        type: transaction.type || 'income',
+        amount: transaction.amount,
+        category_id: transaction.category_id,
+        note: transaction.note || '',
+        date: transaction.date
       }
       // Open Bootstrap modal
       const modal = new window.bootstrap.Modal(document.getElementById('editIncomeModal'))
       modal.show()
     }
 
-    async function updateIncome() {
+    async function updateTransaction() {
       loading.value = true
       try {
-        const response = await fetch('/backend/api/income-api/income-edit-api.php', {
+        const response = await fetch('/backend/api/transaction-api/transaction-edit-api.php', {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -605,6 +726,7 @@ export default {
           },
           body: JSON.stringify({
             id: editingId.value,
+            type: editFormData.value.type,
             amount: editFormData.value.amount,
             category_id: editFormData.value.category_id,
             note: editFormData.value.note || null,
@@ -614,19 +736,19 @@ export default {
         const data = await response.json()
 
         if (data.success) {
-          successMessage.value = 'Income updated successfully!'
+          successMessage.value = 'Transaction updated successfully!'
           // Close modal
           const modal = window.bootstrap.Modal.getInstance(document.getElementById('editIncomeModal'))
           modal.hide()
           editingId.value = null
-          await loadIncome()
+          await loadAllTransactions()
           setTimeout(() => successMessage.value = '', 3000)
         } else {
-          errorMessage.value = data.message || 'Failed to update income'
+          errorMessage.value = data.message || 'Failed to update transaction'
           setTimeout(() => errorMessage.value = '', 3000)
         }
       } catch (err) {
-        errorMessage.value = 'Failed to update income'
+        errorMessage.value = 'Failed to update transaction'
         setTimeout(() => errorMessage.value = '', 3000)
       } finally {
         loading.value = false
@@ -781,12 +903,14 @@ export default {
       }
 
       await loadCategories()
-      await loadIncome()
+      await loadAllTransactions()
       await loadLimits()
     })
 
     return {
       incomeList,
+      expenseList,
+      allTransactions,
       categories,
       loading,
       successMessage,
@@ -798,16 +922,23 @@ export default {
       newCategoryType,
       editCategoryData,
       incomeCategories,
+      filteredCategories,
+      editFilteredCategories,
       totalIncome,
+      totalExpenses,
+      balance,
       limits,
       warningLimit,
       criticalLimit,
       limitsEnabled,
-      loadIncome,
-      addIncome,
-      editIncomeItem,
-      updateIncome,
-      deleteIncomeItem,
+      loadTransactions,
+      loadAllTransactions,
+      addTransaction,
+      editTransactionItem,
+      editTransaction,
+      updateTransaction,
+      deleteTransactionItem,
+      deleteTransaction,
       loadLimits,
       checkLimits,
       addCategory,

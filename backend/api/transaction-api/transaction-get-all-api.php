@@ -1,10 +1,10 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: DELETE');
+header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type, Auth');
 
-require_once __DIR__ . '/../../class/class-income.php';
+require_once __DIR__ . '/../../class/class-transactions.php';
 require_once __DIR__ . '/../../class/class-auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -13,9 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $auth = new Auth();
-$income = new Income();
+$transactions = new Transactions();
 
-$data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 
 if (!$auth->isUser($jwt)) {
@@ -25,13 +24,10 @@ if (!$auth->isUser($jwt)) {
 }
 
 $user_id = $auth->getUserId($jwt);
-$transaction_id = $data['id'] ?? null;
+$start_date = $_GET['start_date'] ?? null;
+$end_date = $_GET['end_date'] ?? null;
+$category_id = $_GET['category_id'] ?? null;
+$type = $_GET['type'] ?? null;
 
-if (!$transaction_id) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Income ID is required']);
-    exit();
-}
-
-echo json_encode($income->deleteIncome($transaction_id, $user_id));
+echo json_encode($transactions->getAllTransactions($user_id, $start_date, $end_date, $category_id, $type));
 ?>
