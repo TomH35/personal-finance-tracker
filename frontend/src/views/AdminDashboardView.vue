@@ -19,6 +19,21 @@ const newCategoryType = ref('expense')
 const selectedCategory = ref({ name: '', type: 'expense' })
 const categoryError = ref('')
 
+// Alert
+const alertMessage = ref('')          // Message text
+const alertVisible = ref(false)
+
+const showAlert = (message, duration = 3000) => {
+  alertMessage.value = message
+  alertVisible.value = true
+
+  // Hide after a delay
+  setTimeout(() => {
+    alertVisible.value = false
+    alertMessage.value = ''
+  }, duration)
+}
+
 // Fetch users and categories
 onMounted(async () => {
   try {
@@ -63,14 +78,15 @@ const createUser = async () => {
     const data = await res.json()
 
     if (data.success) {
-      users.value.push(data.user)
+      users.value.push({ user_id: data.user_id, username: newUser.value.username, email: newUser.value.email, role: newUser.value.role })
       bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide()
+      showAlert(`User ${newUser.value.username} created successfully!`)
     } else {
       alert(data.message)
     }
 
   } catch (err) {
-    alert('Network error: ' + err.message)
+    alert('Error: ' + err.message)
   }
 }
 
@@ -96,16 +112,19 @@ const updateUser = async () => {
     const data = await res.json()
     if (data.success) {
       const index = users.value.findIndex(u => u.user_id === editUserData.value.user_id)
+      const user = users.value.find(u => u.user_id === editUserData.value.user_id)
       if (index !== -1) users.value[index] = { ...editUserData.value }
       bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide()
+      showAlert(`User ${user.username} updated successfully!`)
     } else alert(data.message)
 
   } catch (err) {
-    alert('Network error: ' + err.message)
+    alert('Error: ' + err.message)
   }
 }
 
 const deleteUser = async (user_id) => {
+  const user = users.value.find(u => u.user_id === user_id)
   if (!confirm('Are you sure you want to delete this user?')) return
 
   try {
@@ -121,10 +140,11 @@ const deleteUser = async (user_id) => {
     const data = await res.json()
     if (data.success) {
       users.value = users.value.filter(u => u.user_id !== user_id)
+      showAlert(`User ${user.username} deleted successfully!`)
     } else alert(data.message)
 
   } catch (err) {
-    alert('Network error: ' + err.message)
+    alert('Error: ' + err.message)
   }
 }
 
@@ -274,13 +294,17 @@ const deleteCategory = async (id) => {
                         <td v-if="user.role == 'admin'"><span class="badge bg-success">Admin</span></td>
                         <td v-else><span class="badge bg-secondary">User</span></td>
                         <td class="text-end">
-                          <button class="btn btn-sm btn-outline-warning me-1" @click="openEditUserModal(user)">Edit</button>
+                          <button class="btn btn-sm btn-outline-warning me-1"
+                            @click="openEditUserModal(user)">Edit</button>
                           <button class="btn btn-sm btn-outline-danger"
                             @click="deleteUser(user.user_id)">Delete</button>
                         </td>
                       </tr>
                     </tbody>
                   </table>
+                </div>
+                <div v-if="alertVisible" class="alert alert-success" role="alert">
+                  {{ alertMessage }}
                 </div>
               </div>
             </div>
