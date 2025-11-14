@@ -30,6 +30,9 @@
     $email = $input['email'] ?? '';
     $password = $input['password'] ?? '';
 
+    // Create Auth instance
+    $auth = new Auth();
+
     // Register as admin (role = 'admin')
     $result = $auth->registerUser($username, $email, $password, 'admin');
 
@@ -41,3 +44,4 @@
     }
 
     echo json_encode($result);
+?>
