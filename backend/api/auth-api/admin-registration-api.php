@@ -33,6 +33,17 @@
     // Create Auth instance
     $auth = new Auth();
 
+    $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
+
+    if (!$auth->isAdmin($jwt)) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Permission denied: only admins can create admin users'
+        ]);
+        exit();
+    }
+
     // Register as admin (role = 'admin')
     $result = $auth->registerUser($username, $email, $password, 'admin');
 
@@ -44,4 +55,3 @@
     }
 
     echo json_encode($result);
-?>
