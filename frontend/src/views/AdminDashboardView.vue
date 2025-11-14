@@ -9,12 +9,30 @@ const jwt = loginStore.jwt
 const users = ref([])
 const userError = ref('')
 
+const newUser = ref({ username: '', email: '', password: '', role: 'user' })
+const editUserData = ref({ user_id: null, username: '', email: '', role: 'user' })
+
 // Categories
 const categories = ref([])
 const newCategory = ref('')
 const newCategoryType = ref('expense')
 const selectedCategory = ref({ name: '', type: 'expense' })
 const categoryError = ref('')
+
+// Alert
+const alertMessage = ref('')          // Message text
+const alertVisible = ref(false)
+
+const showAlert = (message, duration = 3000) => {
+  alertMessage.value = message
+  alertVisible.value = true
+
+  // Hide after a delay
+  setTimeout(() => {
+    alertVisible.value = false
+    alertMessage.value = ''
+  }, duration)
+}
 
 // Fetch users and categories
 onMounted(async () => {
@@ -33,44 +51,100 @@ onMounted(async () => {
   getCategories()
 })
 
-// User actions
-const deleteUser = async (user_id) => {
-  if (!confirm('Are you sure you want to delete this user?')) return
+// OPEN "ADD USER" modal
+const openAddUserModal = async () => {
+  newUser.value = { username: '', email: '', password: '', role: 'user' }
+  await nextTick()
+  new bootstrap.Modal(document.getElementById('addUserModal')).show()
+}
+
+// CREATE USER
+const createUser = async () => {
   try {
-    const res = await fetch('/backend/api/user-api/user-delete-api.php', {
+    // Use the correct API based on selected role
+    const apiUrl = newUser.value.role === 'admin'
+      ? '/backend/api/auth-api/admin-registration-api.php'
+      : '/backend/api/auth-api/user-registration-api.php'
+
+    const res = await fetch(apiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
-      body: JSON.stringify({ user_id })
+      headers: {
+        'Content-Type': 'application/json',
+        'auth': `Bearer ${jwt}`
+      },
+      body: JSON.stringify(newUser.value)
     })
+
     const data = await res.json()
-    if (data.success) users.value = users.value.filter(u => u.user_id !== user_id)
-    else alert(data.message)
+
+    if (data.success) {
+      users.value.push({ user_id: data.user_id, username: newUser.value.username, email: newUser.value.email, role: newUser.value.role })
+      bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide()
+      showAlert(`User ${newUser.value.username} created successfully!`)
+    } else {
+      alert(data.message)
+    }
+
   } catch (err) {
-    alert('Network error: ' + err.message)
+    alert('Error: ' + err.message)
   }
 }
 
-const editUser = async (user) => {
-  const newUsername = prompt('Enter new username', user.username)
-  if (!newUsername) return
-  const newEmail = prompt('Enter new email', user.email)
-  if (!newEmail) return
-  const newRole = prompt('Enter role (admin/user)', user.role)
-  if (!['admin', 'user'].includes(newRole)) return alert('Invalid role')
+// OPEN EDIT USER MODAL
+const openEditUserModal = async (user) => {
+  editUserData.value = { ...user }
+  await nextTick()
+  new bootstrap.Modal(document.getElementById('editUserModal')).show()
+}
 
+// UPDATE USER
+const updateUser = async () => {
   try {
     const res = await fetch('/backend/api/user-api/user-edit-api.php', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
-      body: JSON.stringify({ user_id: user.user_id, username: newUsername, email: newEmail, role: newRole })
+      headers: {
+        'Content-Type': 'application/json',
+        'auth': `Bearer ${jwt}`
+      },
+      body: JSON.stringify(editUserData.value)
     })
+
     const data = await res.json()
     if (data.success) {
-      const index = users.value.findIndex(u => u.user_id === user.user_id)
-      if (index !== -1) users.value[index] = { ...users.value[index], username: newUsername, email: newEmail, role: newRole }
+      const index = users.value.findIndex(u => u.user_id === editUserData.value.user_id)
+      const user = users.value.find(u => u.user_id === editUserData.value.user_id)
+      if (index !== -1) users.value[index] = { ...editUserData.value }
+      bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide()
+      showAlert(`User ${user.username} updated successfully!`)
     } else alert(data.message)
+
   } catch (err) {
-    alert('Network error: ' + err.message)
+    alert('Error: ' + err.message)
+  }
+}
+
+const deleteUser = async (user_id) => {
+  const user = users.value.find(u => u.user_id === user_id)
+  if (!confirm('Are you sure you want to delete this user?')) return
+
+  try {
+    const res = await fetch('/backend/api/user-api/user-delete-api.php', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'auth': `Bearer ${jwt}`
+      },
+      body: JSON.stringify({ user_id })
+    })
+
+    const data = await res.json()
+    if (data.success) {
+      users.value = users.value.filter(u => u.user_id !== user_id)
+      showAlert(`User ${user.username} deleted successfully!`)
+    } else alert(data.message)
+
+  } catch (err) {
+    alert('Error: ' + err.message)
   }
 }
 
@@ -118,7 +192,7 @@ const addCategory = async () => {
 
 const openEditCategoryModal = async (category) => {
   selectedCategory.value = { ...category }
-  await nextTick() 
+  await nextTick()
   const modalEl = document.getElementById('editCategoryModal')
   const modal = new bootstrap.Modal(modalEl)
   modal.show()
@@ -173,130 +247,188 @@ const deleteCategory = async (id) => {
 </script>
 
 <template>
-<div class="container-fluid">
-  <div class="row">
+  <div class="container-fluid">
+    <div class="row">
 
-    <!-- Sidebar -->
-    <nav class="col-md-3 col-lg-2 d-md-block bg-white border-end min-vh-100 p-3">
-      <h5 class="text-primary mb-4">Dashboard</h5>
-      <div class="nav flex-column nav-pills" id="adminTab" role="tablist" aria-orientation="vertical">
-        <button class="nav-link active mb-2 text-start" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">👥 Users</button>
-        <button class="nav-link mb-2 text-start" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories" type="button" role="tab">🗂️ Categories</button>
-      </div>
-    </nav>
-
-    <!-- Main content -->
-    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-      <h2 class="fw-semibold mb-4">Admin Panel</h2>
-
-      <div class="tab-content" id="adminTabContent">
-
-        <!-- USERS -->
-        <div class="tab-pane fade show active" id="users" role="tabpanel">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="card-title mb-0">Users List</h5>
-                <button class="btn btn-sm btn-primary">+ Add User</button>
-              </div>
-              <div class="table-responsive">
-                <table class="table align-middle table-hover">
-                  <thead class="table-primary">
-                    <tr>
-                      <th>#</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
-                      <th class="text-end">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="user in users" :key="user.user_id">
-                      <td>{{ user.user_id }}</td>
-                      <td>{{ user.username }}</td>
-                      <td>{{ user.email }}</td>
-                      <td v-if="user.role == 'admin'"><span class="badge bg-success">Admin</span></td>
-                      <td v-else><span class="badge bg-secondary">User</span></td>
-                      <td class="text-end">
-                        <button class="btn btn-sm btn-outline-warning me-1" @click="editUser(user)">Edit</button>
-                        <button class="btn btn-sm btn-outline-danger" @click="deleteUser(user.user_id)">Delete</button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
+      <!-- Sidebar -->
+      <nav class="col-md-3 col-lg-2 d-md-block bg-white border-end min-vh-100 p-3">
+        <h5 class="text-primary mb-4">Dashboard</h5>
+        <div class="nav flex-column nav-pills" id="adminTab" role="tablist" aria-orientation="vertical">
+          <button class="nav-link active mb-2 text-start" id="users-tab" data-bs-toggle="tab" data-bs-target="#users"
+            type="button" role="tab">👥 Users</button>
+          <button class="nav-link mb-2 text-start" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories"
+            type="button" role="tab">🗂️ Categories</button>
         </div>
+      </nav>
 
-        <!-- CATEGORIES -->
-        <div class="tab-pane fade" id="categories" role="tabpanel">
-          <div class="card shadow-sm border-0">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="card-title mb-0">Categories</h5>
-                <div class="input-group" style="max-width: 400px;">
-                  <input v-model="newCategory" type="text" class="form-control" placeholder="New category">
-                  <select v-model="newCategoryType" class="form-select">
-                    <option value="expense">Expense</option>
-                  </select>
-                  <button class="btn btn-primary" @click="addCategory">Add</button>
+      <!-- Main content -->
+      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+        <h2 class="fw-semibold mb-4">Admin Panel</h2>
+
+        <div class="tab-content" id="adminTabContent">
+
+          <!-- USERS -->
+          <div class="tab-pane fade show active" id="users" role="tabpanel">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h5 class="card-title mb-0">Users List</h5>
+                  <button class="btn btn-sm btn-primary" @click="openAddUserModal">+ Add User</button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table align-middle table-hover">
+                    <thead class="table-primary">
+                      <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="user in users" :key="user.user_id">
+                        <td>{{ user.user_id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.email }}</td>
+                        <td v-if="user.role == 'admin'"><span class="badge bg-success">Admin</span></td>
+                        <td v-else><span class="badge bg-secondary">User</span></td>
+                        <td class="text-end">
+                          <button class="btn btn-sm btn-outline-warning me-1"
+                            @click="openEditUserModal(user)">Edit</button>
+                          <button class="btn btn-sm btn-outline-danger"
+                            @click="deleteUser(user.user_id)">Delete</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div v-if="alertVisible" class="alert alert-success" role="alert">
+                  {{ alertMessage }}
                 </div>
               </div>
-              <div class="table-responsive">
-                <table class="table align-middle table-hover">
-                  <thead class="table-primary">
-                    <tr>
-                      <th>#</th>
-                      <th>Category Name</th>
-                      <th>Type</th>
-                      <th class="text-end">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="category in categories" :key="category.id">
-                      <td>{{ category.id }}</td>
-                      <td>{{ category.name }}</td>
-                      <td>
-                        <span v-if="category.type === 'expense'" class="badge bg-danger">Expense</span>
-                      </td>
-                      <td class="text-end">
-                        <button class="btn btn-sm btn-outline-warning me-1" @click="openEditCategoryModal(category)">Edit</button>
-                        <button class="btn btn-sm btn-outline-danger" @click="deleteCategory(category.id)">Delete</button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p v-if="categoryError" class="text-danger mt-2">{{ categoryError }}</p>
+            </div>
+          </div>
+
+          <!-- CATEGORIES -->
+          <div class="tab-pane fade" id="categories" role="tabpanel">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h5 class="card-title mb-0">Categories</h5>
+                  <div class="input-group" style="max-width: 400px;">
+                    <input v-model="newCategory" type="text" class="form-control" placeholder="New category">
+                    <select v-model="newCategoryType" class="form-select">
+                      <option value="expense">Expense</option>
+                    </select>
+                    <button class="btn btn-primary" @click="addCategory">Add</button>
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table align-middle table-hover">
+                    <thead class="table-primary">
+                      <tr>
+                        <th>#</th>
+                        <th>Category Name</th>
+                        <th>Type</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="category in categories" :key="category.id">
+                        <td>{{ category.id }}</td>
+                        <td>{{ category.name }}</td>
+                        <td>
+                          <span v-if="category.type === 'expense'" class="badge bg-danger">Expense</span>
+                        </td>
+                        <td class="text-end">
+                          <button class="btn btn-sm btn-outline-warning me-1"
+                            @click="openEditCategoryModal(category)">Edit</button>
+                          <button class="btn btn-sm btn-outline-danger"
+                            @click="deleteCategory(category.id)">Delete</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p v-if="categoryError" class="text-danger mt-2">{{ categoryError }}</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
+        </div>
+      </main>
+    </div>
+
+    <!-- Edit Category Modal -->
+    <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="editCategoryLabel">Edit Category</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input v-model="selectedCategory.name" class="form-control mb-2" placeholder="Category name" />
+            <select v-model="selectedCategory.type" class="form-select">
+              <option value="expense">Expense</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" @click="updateCategory">Save changes</button>
+          </div>
+        </div>
       </div>
-    </main>
-  </div>
+    </div>
 
-  <!-- Edit Category Modal -->
-  <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="editCategoryLabel">Edit Category</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- Add User Modal -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Add User</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input v-model="newUser.username" class="form-control mb-2" placeholder="Username" />
+            <input v-model="newUser.email" class="form-control mb-2" placeholder="Email" />
+            <input v-model="newUser.password" type="password" class="form-control mb-2" placeholder="Password" />
+            <select v-model="newUser.role" class="form-select">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" @click="createUser">Create</button>
+          </div>
         </div>
-        <div class="modal-body">
-          <input v-model="selectedCategory.name" class="form-control mb-2" placeholder="Category name" />
-          <select v-model="selectedCategory.type" class="form-select">
-            <option value="expense">Expense</option>
-          </select>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button class="btn btn-primary" @click="updateCategory">Save changes</button>
+      </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Edit User</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input v-model="editUserData.username" class="form-control mb-2" placeholder="Username" />
+            <input v-model="editUserData.email" class="form-control mb-2" placeholder="Email" />
+            <select v-model="editUserData.role" class="form-select">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" @click="updateUser">Save changes</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 </template>

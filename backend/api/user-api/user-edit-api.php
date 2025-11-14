@@ -12,6 +12,22 @@
         exit();
     }
 
+    require_once __DIR__ . '/../../class/class-auth.php';
+
+    // Create Auth instance
+    $auth = new Auth();
+
+    $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
+
+    if (!$auth->isAdmin($jwt)) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Permission denied: only admins can edit users'
+        ]);
+        exit();
+    }
+
     // Only allow POST requests
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
