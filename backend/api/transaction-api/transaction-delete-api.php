@@ -4,7 +4,7 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: DELETE');
 header('Access-Control-Allow-Headers: Content-Type, Auth');
 
-require_once __DIR__ . '/../../class/class-transaction.php';
+require_once __DIR__ . '/../../class/class-transactions.php';
 require_once __DIR__ . '/../../class/class-auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $auth = new Auth();
-$transaction = new Transaction();
+$transactions = new Transactions();
 
 $data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
@@ -34,5 +34,5 @@ if (!$transaction_id) {
     exit();
 }
 
-echo json_encode($transaction->deleteTransaction($transaction_id, $user_id, $type));
+echo json_encode($transactions->deleteTransaction($transaction_id, $user_id, $type));
 ?>

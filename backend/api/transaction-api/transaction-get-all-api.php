@@ -4,7 +4,7 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET');
 header('Access-Control-Allow-Headers: Content-Type, Auth');
 
-require_once __DIR__ . '/../../class/class-transaction.php';
+require_once __DIR__ . '/../../class/class-transactions.php';
 require_once __DIR__ . '/../../class/class-auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $auth = new Auth();
-$transaction = new Transaction();
+$transactions = new Transactions();
 
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 
@@ -29,5 +29,5 @@ $end_date = $_GET['end_date'] ?? null;
 $category_id = $_GET['category_id'] ?? null;
 $type = $_GET['type'] ?? null;
 
-echo json_encode($transaction->getAllTransactions($user_id, $start_date, $end_date, $category_id, $type));
+echo json_encode($transactions->getAllTransactions($user_id, $start_date, $end_date, $category_id, $type));
 ?>

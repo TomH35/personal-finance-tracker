@@ -4,7 +4,7 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST');
 header('Access-Control-Allow-Headers: Content-Type, Auth');
 
-require_once __DIR__ . '/../../class/class-transaction.php';
+require_once __DIR__ . '/../../class/class-transactions.php';
 require_once __DIR__ . '/../../class/class-auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 $auth = new Auth();
-$transaction = new Transaction();
+$transactions = new Transactions();
 
 $data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
@@ -31,5 +31,5 @@ $note = $data['note'] ?? null;
 $date = $data['date'] ?? null;
 $type = $data['type'] ?? 'income';
 
-echo json_encode($transaction->createTransaction($user_id, $amount, $category_id, $note, $date, $type));
+echo json_encode($transactions->createTransaction($user_id, $amount, $category_id, $note, $date, $type));
 ?>

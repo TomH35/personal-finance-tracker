@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/class-db.php';
 
-class Transaction {
+class Transactions {
     private $db;
 
     public function __construct() {
