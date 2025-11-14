@@ -1,15 +1,15 @@
 <?php
 require_once __DIR__ . '/class-db.php';
 
-class Income {
+class Transaction {
     private $db;
 
     public function __construct() {
         $this->db = new Db();
     }
 
-    // Create a new income
-    public function createIncome($user_id, $amount, $category_id, $note = null, $date = null) {
+    // Create a new income or expense
+    public function createTransaction($user_id, $amount, $category_id, $note = null, $date = null, $type = 'income') {
         try {
             $pdo = $this->db->getPdo();
 
@@ -21,17 +21,22 @@ class Income {
                 return ['success' => false, 'message' => 'Category is required'];
             }
 
+            // Validate type
+            if (!in_array($type, ['income', 'expense'])) {
+                return ['success' => false, 'message' => 'Invalid type. Must be income or expense'];
+            }
+
             // Verify category exists and user has access to it
             $stmt = $pdo->prepare("
                 SELECT category_id FROM categories 
                 WHERE category_id = :category_id 
-                AND type = 'income'
+                AND type = :type
                 AND (user_id = :user_id OR is_predefined = 1)
             ");
-            $stmt->execute(['category_id' => $category_id, 'user_id' => $user_id]);
+            $stmt->execute(['category_id' => $category_id, 'user_id' => $user_id, 'type' => $type]);
             
             if (!$stmt->fetch()) {
-                return ['success' => false, 'message' => 'Invalid income category'];
+                return ['success' => false, 'message' => 'Invalid ' . $type . ' category'];
             }
 
             // If no date provided, use current date
@@ -41,29 +46,30 @@ class Income {
 
             $stmt = $pdo->prepare("
                 INSERT INTO transactions (user_id, amount, category_id, note, date, type)
-                VALUES (:user_id, :amount, :category_id, :note, :date, 'income')
+                VALUES (:user_id, :amount, :category_id, :note, :date, :type)
             ");
             $stmt->execute([
                 'user_id' => $user_id,
                 'amount' => $amount,
                 'category_id' => $category_id,
                 'note' => $note,
-                'date' => $date
+                'date' => $date,
+                'type' => $type
             ]);
 
             $transaction_id = $pdo->lastInsertId();
 
             return [
                 'success' => true,
-                'message' => 'Income created successfully',
-                'income' => [
+                'message' => ucfirst($type) . ' created successfully',
+                'transaction' => [
                     'id' => $transaction_id,
                     'user_id' => $user_id,
                     'amount' => $amount,
                     'category_id' => $category_id,
                     'note' => $note,
                     'date' => $date,
-                    'type' => 'income'
+                    'type' => $type
                 ]
             ];
         } catch (PDOException $e) {
@@ -71,10 +77,15 @@ class Income {
         }
     }
 
-    // Get all income for a user
-    public function getAllIncome($user_id, $start_date = null, $end_date = null, $category_id = null) {
+    // Get all income or expenses for a user
+    public function getAllTransactions($user_id, $start_date = null, $end_date = null, $category_id = null, $type = null) {
         try {
             $pdo = $this->db->getPdo();
+
+            // Validate type if provided
+            if ($type !== null && !in_array($type, ['income', 'expense'])) {
+                return ['success' => false, 'message' => 'Invalid type. Must be income or expense'];
+            }
 
             $sql = "
                 SELECT 
@@ -83,14 +94,21 @@ class Income {
                     t.note,
                     t.date,
                     t.category_id,
+                    t.type,
                     c.name AS category_name,
                     c.type AS category_type
                 FROM transactions t
                 LEFT JOIN categories c ON t.category_id = c.category_id
-                WHERE t.user_id = :user_id AND t.type = 'income'
+                WHERE t.user_id = :user_id
             ";
 
             $params = ['user_id' => $user_id];
+
+            // Filter by type if specified
+            if ($type !== null) {
+                $sql .= " AND t.type = :type";
+                $params['type'] = $type;
+            }
 
             // Filter by date range
             if ($start_date) {
@@ -114,17 +132,22 @@ class Income {
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
 
-            $income = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            return ['success' => true, 'income' => $income];
+            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return ['success' => true, 'transactions' => $transactions];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Failed to load income: ' . $e->getMessage()];
+            return ['success' => false, 'message' => 'Failed to load transactions: ' . $e->getMessage()];
         }
     }
 
-    // Get a single income by ID
-    public function getIncomeById($transaction_id, $user_id) {
+    // Get a single income or expense by ID
+    public function getIncomeById($transaction_id, $user_id, $type = 'income') {
         try {
             $pdo = $this->db->getPdo();
+
+            // Validate type
+            if (!in_array($type, ['income', 'expense'])) {
+                return ['success' => false, 'message' => 'Invalid type. Must be income or expense'];
+            }
 
             $stmt = $pdo->prepare("
                 SELECT 
@@ -133,28 +156,29 @@ class Income {
                     t.note,
                     t.date,
                     t.category_id,
+                    t.type,
                     c.name AS category_name,
                     c.type AS category_type
                 FROM transactions t
                 LEFT JOIN categories c ON t.category_id = c.category_id
-                WHERE t.transaction_id = :transaction_id AND t.user_id = :user_id AND t.type = 'income'
+                WHERE t.transaction_id = :transaction_id AND t.user_id = :user_id AND t.type = :type
             ");
-            $stmt->execute(['transaction_id' => $transaction_id, 'user_id' => $user_id]);
+            $stmt->execute(['transaction_id' => $transaction_id, 'user_id' => $user_id, 'type' => $type]);
 
-            $income = $stmt->fetch(PDO::FETCH_ASSOC);
+            $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($income) {
-                return ['success' => true, 'income' => $income];
+            if ($transaction) {
+                return ['success' => true, 'transaction' => $transaction];
             } else {
-                return ['success' => false, 'message' => 'Income not found'];
+                return ['success' => false, 'message' => ucfirst($type) . ' not found'];
             }
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Failed to load income: ' . $e->getMessage()];
+            return ['success' => false, 'message' => 'Failed to load transaction: ' . $e->getMessage()];
         }
     }
 
-    // Update an income
-    public function updateIncome($transaction_id, $user_id, $amount, $category_id, $note = null, $date = null) {
+    // Update an income or expense
+    public function updateTransaction($transaction_id, $user_id, $amount, $category_id, $note = null, $date = null, $type = 'income') {
         try {
             $pdo = $this->db->getPdo();
 
@@ -166,25 +190,30 @@ class Income {
                 return ['success' => false, 'message' => 'Category is required'];
             }
 
-            // Verify income belongs to user
-            $stmt = $pdo->prepare("SELECT transaction_id FROM transactions WHERE transaction_id = :transaction_id AND user_id = :user_id AND type = 'income'");
-            $stmt->execute(['transaction_id' => $transaction_id, 'user_id' => $user_id]);
+            // Validate type
+            if (!in_array($type, ['income', 'expense'])) {
+                return ['success' => false, 'message' => 'Invalid type. Must be income or expense'];
+            }
+
+            // Verify transaction belongs to user and matches type
+            $stmt = $pdo->prepare("SELECT transaction_id FROM transactions WHERE transaction_id = :transaction_id AND user_id = :user_id AND type = :type");
+            $stmt->execute(['transaction_id' => $transaction_id, 'user_id' => $user_id, 'type' => $type]);
             
             if (!$stmt->fetch()) {
-                return ['success' => false, 'message' => 'Income not found or access denied'];
+                return ['success' => false, 'message' => ucfirst($type) . ' not found or access denied'];
             }
 
             // Verify category exists and user has access to it
             $stmt = $pdo->prepare("
                 SELECT category_id FROM categories 
                 WHERE category_id = :category_id 
-                AND type = 'income'
+                AND type = :type
                 AND (user_id = :user_id OR is_predefined = 1)
             ");
-            $stmt->execute(['category_id' => $category_id, 'user_id' => $user_id]);
+            $stmt->execute(['category_id' => $category_id, 'user_id' => $user_id, 'type' => $type]);
             
             if (!$stmt->fetch()) {
-                return ['success' => false, 'message' => 'Invalid income category'];
+                return ['success' => false, 'message' => 'Invalid ' . $type . ' category'];
             }
 
             $stmt = $pdo->prepare("
@@ -204,41 +233,43 @@ class Income {
                 'user_id' => $user_id
             ]);
 
-            return ['success' => true, 'message' => 'Income updated successfully'];
+            return ['success' => true, 'message' => ucfirst($type) . ' updated successfully'];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Failed to update income: ' . $e->getMessage()];
+            return ['success' => false, 'message' => 'Failed to update ' . $type . ': ' . $e->getMessage()];
         }
     }
 
-    // Delete an income
-    public function deleteIncome($transaction_id, $user_id) {
+    // Delete an income or expense
+    public function deleteTransaction($transaction_id, $user_id, $type) {
         try {
             $pdo = $this->db->getPdo();
 
-            // Verify income belongs to user
-            $stmt = $pdo->prepare("SELECT transaction_id FROM transactions WHERE transaction_id = :transaction_id AND user_id = :user_id AND type = 'income'");
-            $stmt->execute(['transaction_id' => $transaction_id, 'user_id' => $user_id]);
-            
-            if (!$stmt->fetch()) {
-                return ['success' => false, 'message' => 'Income not found or access denied'];
+            // Validate type
+            if (!in_array($type, ['income', 'expense'])) {
+                return ['success' => false, 'message' => 'Invalid type. Must be income or expense'];
             }
 
             $stmt = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = :transaction_id AND user_id = :user_id");
             $stmt->execute(['transaction_id' => $transaction_id, 'user_id' => $user_id]);
 
-            return ['success' => true, 'message' => 'Income deleted successfully'];
+            return ['success' => true, 'message' => ucfirst($type) . ' deleted successfully'];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Failed to delete income: ' . $e->getMessage()];
+            return ['success' => false, 'message' => 'Failed to delete ' . $type . ': ' . $e->getMessage()];
         }
     }
 
-    // Get total income for a user in a period
-    public function getTotalIncome($user_id, $start_date = null, $end_date = null, $category_id = null) {
+    // Get total income or expenses for a user in a period
+    public function getTotalIncome($user_id, $start_date = null, $end_date = null, $category_id = null, $type = 'income') {
         try {
             $pdo = $this->db->getPdo();
 
-            $sql = "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = :user_id AND type = 'income'";
-            $params = ['user_id' => $user_id];
+            // Validate type
+            if (!in_array($type, ['income', 'expense'])) {
+                return ['success' => false, 'message' => 'Invalid type. Must be income or expense'];
+            }
+
+            $sql = "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = :user_id AND type = :type";
+            $params = ['user_id' => $user_id, 'type' => $type];
 
             if ($start_date) {
                 $sql .= " AND date >= :start_date";
@@ -261,14 +292,19 @@ class Income {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             return ['success' => true, 'total' => $result['total']];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Failed to calculate total income: ' . $e->getMessage()];
+            return ['success' => false, 'message' => 'Failed to calculate total: ' . $e->getMessage()];
         }
     }
 
-    // Get income grouped by category
-    public function getIncomeByCategory($user_id, $start_date = null, $end_date = null) {
+    // Get income or expenses grouped by category
+    public function getIncomeByCategory($user_id, $start_date = null, $end_date = null, $type = 'income') {
         try {
             $pdo = $this->db->getPdo();
+
+            // Validate type
+            if (!in_array($type, ['income', 'expense'])) {
+                return ['success' => false, 'message' => 'Invalid type. Must be income or expense'];
+            }
 
             $sql = "
                 SELECT 
@@ -276,14 +312,14 @@ class Income {
                     c.name AS category_name,
                     c.type AS category_type,
                     COALESCE(SUM(t.amount), 0) AS total_amount,
-                    COUNT(t.transaction_id) AS income_count
+                    COUNT(t.transaction_id) AS transaction_count
                 FROM categories c
                 LEFT JOIN transactions t ON c.category_id = t.category_id 
                     AND t.user_id = :user_id 
-                    AND t.type = 'income'
+                    AND t.type = :type
             ";
 
-            $params = ['user_id' => $user_id];
+            $params = ['user_id' => $user_id, 'type' => $type];
 
             if ($start_date || $end_date) {
                 $conditions = [];
@@ -298,18 +334,19 @@ class Income {
                 $sql .= " AND (" . implode(" AND ", $conditions) . ")";
             }
 
-            $sql .= " WHERE (c.user_id = :user_id2 OR c.is_predefined = 1) AND c.type = 'income'";
+            $sql .= " WHERE (c.user_id = :user_id2 OR c.is_predefined = 1) AND c.type = :type2";
             $params['user_id2'] = $user_id;
+            $params['type2'] = $type;
 
             $sql .= " GROUP BY c.category_id, c.name, c.type ORDER BY total_amount DESC";
 
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
 
-            $income_by_category = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            return ['success' => true, 'data' => $income_by_category];
+            $transactions_by_category = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return ['success' => true, 'data' => $transactions_by_category];
         } catch (PDOException $e) {
-            return ['success' => false, 'message' => 'Failed to load income by category: ' . $e->getMessage()];
+            return ['success' => false, 'message' => 'Failed to load transactions by category: ' . $e->getMessage()];
         }
     }
 }
