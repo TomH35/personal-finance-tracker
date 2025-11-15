@@ -33,6 +33,15 @@
                       <label class="form-label">Email Address</label>
                       <input type="email" v-model="profileForm.email" class="form-control" placeholder="john@example.com" required />
                     </div>
+                    <div class="col-md-12">
+                      <label class="form-label">Currency</label>
+                      <select v-model="profileForm.currency" class="form-select" required>
+                        <option value="USD">USD - $ (US Dollar)</option>
+                        <option value="EUR">EUR - € (Euro)</option>
+                        <option value="PLN">PLN - zł (Polish Złoty)</option>
+                        <option value="CZK">CZK - Kč (Czech Koruna)</option>
+                      </select>
+                    </div>
                   </div>
                   <div class="text-end mt-3">
                     <button type="submit" class="btn btn-primary" :disabled="loadingProfile">
@@ -182,7 +191,7 @@ export default {
     const loadingDelete = ref(false)
     const showDeleteModal = ref(false)
 
-    const profileForm = ref({ name: '', email: '' })
+    const profileForm = ref({ name: '', email: '', currency: 'USD' })
     const passwordForm = ref({ currentPassword: '', newPassword: '', confirmPassword: '' })
     const limitForm = ref({ limit_id: null, warning_limit: '', critical_limit: '' })
     const deleteForm = ref({ password: '' })
@@ -192,9 +201,23 @@ export default {
 
     async function loadProfile() {
       try {
-        profileForm.value.name = 'John Doe'
-        profileForm.value.email = 'john@example.com'
-      } catch (err) { console.error(err) }
+        const res = await fetch('/backend/api/user-api/user-get-profile-api.php', {
+          headers: { 'Auth': `Bearer ${loginStore.jwt}` }
+        })
+        const data = await res.json()
+        if (data.success && data.user) {
+          profileForm.value.name = data.user.username
+          profileForm.value.email = data.user.email
+          profileForm.value.currency = data.user.currency || 'USD'
+        } else {
+          errorMessage.value = 'Failed to load profile'
+          setTimeout(() => errorMessage.value = '', 3000)
+        }
+      } catch (err) { 
+        console.error(err)
+        errorMessage.value = 'Network error loading profile'
+        setTimeout(() => errorMessage.value = '', 3000)
+      }
     }
 
     async function loadLimits() {
@@ -298,8 +321,32 @@ export default {
       loadingProfile.value = true
       errorMessage.value = ''
       successMessage.value = ''
-      try { await new Promise(r => setTimeout(r, 1000)); successMessage.value='Profile updated successfully!'; setTimeout(()=>successMessage.value='',3000) }
-      catch { errorMessage.value='Failed to update profile' }
+      try {
+        const res = await fetch('/backend/api/user-api/user-update-profile-api.php', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}` 
+          },
+          body: JSON.stringify({
+            username: profileForm.value.name,
+            email: profileForm.value.email,
+            currency: profileForm.value.currency
+          })
+        })
+        const data = await res.json()
+        if (data.success) {
+          successMessage.value = 'Profile updated successfully!'
+          setTimeout(() => successMessage.value = '', 3000)
+        } else {
+          errorMessage.value = data.message || 'Failed to update profile'
+          setTimeout(() => errorMessage.value = '', 3000)
+        }
+      } catch (err) { 
+        console.error(err)
+        errorMessage.value = 'Network error updating profile'
+        setTimeout(() => errorMessage.value = '', 3000)
+      }
       finally { loadingProfile.value = false }
     }
 

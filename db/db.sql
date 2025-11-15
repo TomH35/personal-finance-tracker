@@ -14,6 +14,7 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL,		     -- Email
     password_hash VARCHAR(255) NOT NULL,             -- Hashed password
     role ENUM('admin', 'user') DEFAULT 'user',       -- User role
+    currency VARCHAR(3) DEFAULT 'USD',               -- User's preferred currency (ISO 4217 code)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP    -- Creation time
 );
 
