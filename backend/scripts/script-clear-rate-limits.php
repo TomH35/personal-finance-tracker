@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/class-db.php';
+require_once __DIR__ . '/../class/class-db.php';
 
 try {
     $db = new Db();
