@@ -8,15 +8,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit();
 
 require_once __DIR__ . '/../../class/class-auth.php';
 require_once __DIR__ . '/../../class/class-rate-limiter.php';
-require_once __DIR__ . '/../../class/class-db.php';
-
-$db = new Db();
-$pdo = $db->getPdo();
 
 $ip = $_SERVER['REMOTE_ADDR'];
 $endpoint = "user_registration";
 
-$rateLimiter = new RateLimiter($pdo);
+$rateLimiter = new RateLimiter();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $username = $input['username'] ?? '';
@@ -24,20 +20,20 @@ $email    = $input['email'] ?? '';
 $password = $input['password'] ?? '';
 
 // Check if banned
-$userId = null; // user ešte neexistuje
-if ($rateLimiter->isBlocked($ip, $endpoint, $userId)) {
+if ($rateLimiter->isBlocked($ip, $endpoint)) {
+    $rateLimiter->registerAttempt($ip, $endpoint, null);
     http_response_code(429);
-    $rateLimiter->registerAttempt($ip, $endpoint, $userId);
     echo json_encode(['success'=>false,'message'=>'Too many registration attempts. Try later.']);
     exit();
 }
+
 
 // Attempt registration
 $auth = new Auth();
 $result = $auth->registerUser($username, $email, $password);
 
 // Determine user_id if registration successful
-if ($result['success']) $userId = $result['user_id'] ?? null;
+$userId = $result['success'] ? ($result['user_id'] ?? null) : null;
 
 // Log attempt (always)
 $rateLimiter->registerAttempt($ip, $endpoint, $userId);

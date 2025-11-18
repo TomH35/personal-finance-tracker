@@ -8,15 +8,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit();
 
 require_once __DIR__ . '/../../class/class-auth.php';
 require_once __DIR__ . '/../../class/class-rate-limiter.php';
-require_once __DIR__ . '/../../class/class-db.php';
-
-$db = new Db();
-$pdo = $db->getPdo();
 
 $ip = $_SERVER['REMOTE_ADDR'];
 $endpoint = "user_login";
 
-$rateLimiter = new RateLimiter($pdo);
+$rateLimiter = new RateLimiter();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $identifier = $input['identifier'] ?? '';

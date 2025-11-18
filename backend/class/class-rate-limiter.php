@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/class-db.php';
+
 class RateLimiter
 {
     private $pdo;
@@ -6,12 +8,14 @@ class RateLimiter
     private $windowSeconds;
     private $banSeconds;
 
-    public function __construct($pdo, $maxAttempts = 5, $windowSeconds = 60, $banSeconds = 30)
+    public function __construct($maxAttempts = 5, $windowSeconds = 60, $banSeconds = 30)
     {
-        $this->pdo = $pdo;
+        $db = new Db();
+        $this->pdo = $db->getPdo();
+
         $this->maxAttempts = $maxAttempts;
         $this->windowSeconds = $windowSeconds;
-        $this->banSeconds = $banSeconds; 
+        $this->banSeconds = $banSeconds;
     }
 
     // Check if currently blocked
@@ -31,55 +35,51 @@ class RateLimiter
         return $row && $row['blocked_until'] !== null && strtotime($row['blocked_until']) > time();
     }
 
-    // Log attempt, optionally store ban time
-    public function registerAttempt($ip, $endpoint, $userId = null, $blockedUntil = null, $userIdentifier = null)
+    // Log attempt
+    public function registerAttempt($ip, $endpoint, $userId = null, $blockedUntil = null, $identifier = null)
     {
-        // auto-detect user_id if identifier provided
-        if ($userId === null && $userIdentifier !== null) {
+        // Auto-detect user ID if identifier provided
+        if ($userId === null && $identifier !== null) {
             $stmt = $this->pdo->prepare("SELECT user_id FROM users WHERE username = ? OR email = ? LIMIT 1");
-            $stmt->execute([$userIdentifier, $userIdentifier]);
+            $stmt->execute([$identifier, $identifier]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($user) $userId = $user['user_id'];
         }
 
-        $query = "
+        $stmt = $this->pdo->prepare("
             INSERT INTO rate_limits (ip, endpoint, user_id, blocked_until)
             VALUES (?, ?, ?, ?)
-        ";
-        $stmt = $this->pdo->prepare($query);
+        ");
         $stmt->execute([$ip, $endpoint, $userId, $blockedUntil]);
     }
 
-    // Check sliding window and apply ban if needed
-    public function checkLimit($ip, $endpoint, $userId = null, $userIdentifier = null)
+    // Check window + apply ban if needed
+    public function checkLimit($ip, $endpoint, $userId = null, $identifier = null)
     {
-        $query = "
+        $stmt = $this->pdo->prepare("
             SELECT COUNT(*) AS attempts
             FROM rate_limits
-            WHERE ip = ? AND endpoint = ? 
+            WHERE ip = ? AND endpoint = ?
               AND blocked_until IS NULL
               AND created_at >= (NOW() - INTERVAL ? SECOND)
-        ";
-
-        $stmt = $this->pdo->prepare($query);
+        ");
         $stmt->execute([$ip, $endpoint, $this->windowSeconds]);
         $attempts = $stmt->fetch(PDO::FETCH_ASSOC)['attempts'];
 
         if ($attempts >= $this->maxAttempts) {
-            $this->applyBan($ip, $endpoint, $userId, $userIdentifier);
+            $this->applyBan($ip, $endpoint, $userId, $identifier);
             return false;
         }
 
         return true;
     }
 
-    // Apply temporary ban
-    private function applyBan($ip, $endpoint, $userId = null, $userIdentifier = null)
+    // Apply ban
+    private function applyBan($ip, $endpoint, $userId = null, $identifier = null)
     {
-        // Auto-detect user_id if identifier provided
-        if ($userId === null && $userIdentifier !== null) {
+        if ($userId === null && $identifier !== null) {
             $stmt = $this->pdo->prepare("SELECT user_id FROM users WHERE username = ? OR email = ? LIMIT 1");
-            $stmt->execute([$userIdentifier, $userIdentifier]);
+            $stmt->execute([$identifier, $identifier]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($user) $userId = $user['user_id'];
         }
