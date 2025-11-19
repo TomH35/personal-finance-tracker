@@ -83,3 +83,19 @@ CREATE TABLE notifications (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (limit_id) REFERENCES spending_limits(limit_id) ON DELETE SET NULL
 );
+
+-- ========================================
+--  TABLE: rate_limits
+-- ========================================
+-- Each record represents one login or registration attempt,
+-- including the IP address, optionally linked user, endpoint, 
+-- timestamp of the attempt, and temporary ban expiration if any.
+CREATE TABLE rate_limits (
+    id INT AUTO_INCREMENT PRIMARY KEY,            -- Attempt ID
+    ip VARCHAR(50) NOT NULL,                      -- IP address of the user
+    user_id INT NULL,                             -- Linked user (if known)
+    endpoint VARCHAR(100) NOT NULL,               -- API endpoint (login/register)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- Attempt timestamp
+    blocked_until TIMESTAMP NULL                  -- Ban expiry timestamp (if blocked)
+);
+
