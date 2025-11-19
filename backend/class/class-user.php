@@ -97,6 +97,83 @@ class User
         }
     }
 
+    public function getUserProfile($user_id)
+    {
+        try {
+            $stmt = $this->db->prepare("SELECT user_id, username, email, role, currency FROM users WHERE user_id = :user_id");
+            $stmt->execute(['user_id' => $user_id]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found'
+                ];
+            }
+
+            return [
+                'success' => true,
+                'user' => $user
+            ];
+        } catch (PDOException $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to retrieve user profile: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    public function updateUserProfile($user_id, $username, $email, $currency)
+    {
+        try {
+            // Basic input validation
+            if (empty($username) || empty($email)) {
+                return [
+                    'success' => false,
+                    'message' => 'Username and email are required'
+                ];
+            }
+
+            // Validate currency code
+            $validCurrencies = ['USD', 'EUR', 'PLN', 'CZK'];
+            if (!in_array($currency, $validCurrencies)) {
+                return [
+                    'success' => false,
+                    'message' => 'Invalid currency code'
+                ];
+            }
+
+            $stmt = $this->db->prepare("
+                UPDATE users
+                SET username = :username, email = :email, currency = :currency
+                WHERE user_id = :user_id
+            ");
+            $stmt->execute([
+                'username' => $username,
+                'email' => $email,
+                'currency' => $currency,
+                'user_id' => $user_id
+            ]);
+
+            if ($stmt->rowCount() === 0) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found or no changes made'
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Profile updated successfully'
+            ];
+        } catch (PDOException $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to update profile: ' . $e->getMessage()
+            ];
+        }
+    }
+
     public function deleteOwnAccount($user_id)
     {
         try {
