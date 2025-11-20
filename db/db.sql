@@ -9,12 +9,13 @@ USE finance_tracker_db;
 -- ========================================
 -- Each record represents one registered user in the system.
 CREATE TABLE users (
-    user_id INT AUTO_INCREMENT PRIMARY KEY,          -- User ID
-    username VARCHAR(50) UNIQUE NOT NULL,            -- Username
-    email VARCHAR(255) NOT NULL,		     -- Email
-    password_hash VARCHAR(255) NOT NULL,             -- Hashed password
-    role ENUM('admin', 'user') DEFAULT 'user',       -- User role
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP    -- Creation time
+    user_id INT AUTO_INCREMENT PRIMARY KEY,                                     -- User ID
+    username VARCHAR(50) UNIQUE NOT NULL,                                       -- Username
+    email VARCHAR(255) NOT NULL,                                                -- Email
+    password_hash VARCHAR(255) NOT NULL,                                        -- Hashed password
+    role ENUM('admin', 'user') DEFAULT 'user',                                  -- User role
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,                              -- Creation time
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP   -- Last update time
 );
 
 -- ========================================
@@ -57,8 +58,8 @@ CREATE TABLE transactions (
 -- Each record represents one user's monthly spending limit
 -- including thresholds for warning and critical notifications.
 CREATE TABLE spending_limits (
-    limit_id INT AUTO_INCREMENT PRIMARY KEY,          -- Limit ID
-    user_id INT NOT NULL,                             -- Linked user
+    limit_id INT AUTO_INCREMENT PRIMARY KEY,         -- Limit ID
+    user_id INT NOT NULL,                            -- Linked user
     warning_limit DECIMAL(10,2) NOT NULL,            -- Warning threshold
     critical_limit DECIMAL(10,2) NOT NULL,           -- Critical threshold
     enabled TINYINT(1) NOT NULL DEFAULT 1,           -- Whether limit is active
@@ -72,13 +73,13 @@ CREATE TABLE spending_limits (
 -- Each record represents one notification for a user,
 -- optionally linked to a spending limit (warning or critical).
 CREATE TABLE notifications (
-    notification_id INT AUTO_INCREMENT PRIMARY KEY,   -- Notification ID
-    user_id INT NOT NULL,                             -- Linked user
-    limit_id INT NULL,                                -- Linked limit (optional)
-    type ENUM('warning', 'critical', 'info') DEFAULT 'info',  -- Notification type
-    message VARCHAR(255) NOT NULL,                    -- Message text
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,    -- Creation time
-    is_read BOOLEAN DEFAULT FALSE,                    -- Read flag
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,   			-- Notification ID
+    user_id INT NOT NULL,                             			-- Linked user
+    limit_id INT NULL,                                			-- Linked limit (optional)
+    type ENUM('warning', 'critical', 'info') DEFAULT 'info',  	-- Notification type
+    message VARCHAR(255) NOT NULL,                    			-- Message text
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,    			-- Creation time
+    is_read BOOLEAN DEFAULT FALSE,                    			-- Read flag
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (limit_id) REFERENCES spending_limits(limit_id) ON DELETE SET NULL
@@ -91,11 +92,11 @@ CREATE TABLE notifications (
 -- including the IP address, optionally linked user, endpoint, 
 -- timestamp of the attempt, and temporary ban expiration if any.
 CREATE TABLE rate_limits (
-    id INT AUTO_INCREMENT PRIMARY KEY,            -- Attempt ID
-    ip VARCHAR(50) NOT NULL,                      -- IP address of the user
-    user_id INT NULL,                             -- Linked user (if known)
-    endpoint VARCHAR(100) NOT NULL,               -- API endpoint (login/register)
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- Attempt timestamp
-    blocked_until TIMESTAMP NULL                  -- Ban expiry timestamp (if blocked)
+    id INT AUTO_INCREMENT PRIMARY KEY,            	-- Attempt ID
+    ip VARCHAR(50) NOT NULL,                      	-- IP address of the user
+    user_id INT NULL,                             	-- Linked user (if known)
+    endpoint VARCHAR(100) NOT NULL,               	-- API endpoint (login/register)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Attempt timestamp
+    blocked_until TIMESTAMP NULL                  	-- Ban expiry timestamp (if blocked)
 );
 
