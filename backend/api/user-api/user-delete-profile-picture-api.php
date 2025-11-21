@@ -6,35 +6,23 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Auth');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(200);
 
 require_once __DIR__ . '/../../class/class-auth.php';
+require_once __DIR__ . '/../../class/class-user.php';
+
 $auth = new Auth();
+$user = new User();
 
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 $userId = $auth->getUserId($jwt);
+
 if (!$userId) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit();
 }
 
-$extensions = ['jpg','jpeg','png','gif'];
-$deleted = false;
-foreach ($extensions as $ext) {
-    $filePath = __DIR__ . '/../../public/user-images/user_' . $userId . '.' . $ext;
-    if (file_exists($filePath)) {
-        unlink($filePath);
-        $deleted = true;
-        break;
-    }
-}
+$result = $user->deleteProfilePicture($userId);
 
-if ($deleted) {
-    echo json_encode(['success' => true, 'message' => 'Profile picture deleted']);
-} else {
-    echo json_encode(['success' => false, 'message' => 'No profile picture found']);
-}
+echo json_encode($result);
