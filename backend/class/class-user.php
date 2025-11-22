@@ -4,12 +4,17 @@ require_once __DIR__ . '/class-db.php';
 class User
 {
     private $db;
+    private $imageDir;
 
     public function __construct()
     {
         $database = new Db();
         $this->db = $database->getPdo();
+
+        // path to images
+        $this->imageDir = __DIR__ . '/../public/user-images/';
     }
+
 
     public function getAllUsers()
     {
@@ -120,5 +125,89 @@ class User
                 'message' => 'Failed to delete account: ' . $e->getMessage()
             ];
         }
+    }
+
+    public function uploadProfilePicture($user_id, $file)
+    {
+        if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
+            return [
+                'success' => false,
+                'message' => 'Upload error'
+            ];
+        }
+
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allowed = ['jpg', 'jpeg', 'png', 'gif'];
+
+        if (!in_array($ext, $allowed)) {
+            return [
+                'success' => false,
+                'message' => 'Invalid file type'
+            ];
+        }
+
+        if (!is_dir($this->imageDir)) {
+            mkdir($this->imageDir, 0755, true);
+        }
+
+        // odstránenie starého obrázka
+        $this->deleteProfilePicture($user_id);
+
+        $fileName = "user_{$user_id}.{$ext}";
+        $fullPath = $this->imageDir . $fileName;
+
+        if (move_uploaded_file($file['tmp_name'], $fullPath)) {
+            return [
+                'success' => true,
+                'fileName' => $fileName,
+                'url' => '/public/user-images/' . $fileName
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => 'Failed to save image'
+        ];
+    }
+
+    public function deleteProfilePicture($user_id)
+    {
+        $extensions = ['jpg', 'jpeg', 'png', 'gif'];
+        $deleted = false;
+
+        foreach ($extensions as $ext) {
+            $path = $this->imageDir . "user_{$user_id}.{$ext}";
+            if (file_exists($path)) {
+                unlink($path);
+                $deleted = true;
+            }
+        }
+
+        return [
+            'success' => $deleted,
+            'message' => $deleted ? 'Picture deleted' : 'No picture found'
+        ];
+    }
+
+    public function getProfilePicture($user_id)
+    {
+        $extensions = ['jpg', 'jpeg', 'png', 'gif'];
+
+        foreach ($extensions as $ext) {
+            $path = $this->imageDir . "user_{$user_id}.{$ext}";
+            if (file_exists($path)) {
+                return [
+                    'success' => true,
+                    'exists' => true,
+                    'url' => '/public/user-images/user_' . $user_id . '.' . $ext
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'exists' => false,
+            'url' => null
+        ];
     }
 }
