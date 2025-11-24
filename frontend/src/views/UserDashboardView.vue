@@ -117,7 +117,6 @@
             </div>
           </div>
 
-          <!-- Transactions -->
           <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-center mb-3">
@@ -126,6 +125,45 @@
                   <i class="bi bi-arrow-clockwise"></i> Refresh
                 </button>
               </div>
+
+             
+              <div class="row g-3 mb-3 align-items-end">
+                <div class="col-md-2">
+                  <label class="form-label small mb-1">Type</label>
+                  <select v-model="filterType" class="form-select form-select-sm">
+                    <option value="all">All</option>
+                    <option value="income">Income</option>
+                    <option value="expense">Expense</option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small mb-1">Category</label>
+                  <select v-model="filterCategory" class="form-select form-select-sm">
+                    <option value="all">All Categories</option>
+                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                      {{ cat.name }}
+                    </option>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small mb-1">Min Amount</label>
+                  <input type="number" v-model="filterMinAmount" class="form-control form-control-sm" placeholder="0" step="0.01">
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label small mb-1">Max Amount</label>
+                  <input type="number" v-model="filterMaxAmount" class="form-control form-control-sm" placeholder="∞" step="0.01">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label small mb-1">Sort By</label>
+                  <select v-model="sortBy" class="form-select form-select-sm">
+                    <option value="date-desc">Date (Newest First)</option>
+                    <option value="date-asc">Date (Oldest First)</option>
+                    <option value="amount-desc">Amount (Highest First)</option>
+                    <option value="amount-asc">Amount (Lowest First)</option>
+                  </select>
+                </div>
+              </div>
+
               <div v-if="loading" class="text-center py-4">
                 <div class="spinner-border text-primary" role="status">
                   <span class="visually-hidden">Loading...</span>
@@ -133,6 +171,9 @@
               </div>
               <div v-else-if="allTransactions.length === 0" class="text-center py-4 text-muted">
                 No transactions yet. Add your first transaction above!
+              </div>
+              <div v-else-if="filteredAndSortedTransactions.length === 0" class="text-center py-4 text-muted">
+                No transactions match your filters. Try adjusting the filters above.
               </div>
               <div v-else class="table-responsive">
                 <table class="table table-hover align-middle">
@@ -147,7 +188,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="transaction in allTransactions" :key="transaction.id">
+                    <tr v-for="transaction in filteredAndSortedTransactions" :key="transaction.id">
                       <td>
                         <span class="badge" :class="transaction.type === 'income' ? 'bg-success' : 'bg-danger'">
                           {{ transaction.type === 'income' ? 'Income' : 'Expense' }}
@@ -185,7 +226,6 @@
       </div>
     </div>
 
-    <!-- Edit Transaction Modal -->
     <div class="modal fade" id="editIncomeModal" tabindex="-1" aria-labelledby="editIncomeModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -253,7 +293,7 @@
       </div>
     </div>
 
-    <!-- Create Category Modal -->
+
     <div class="modal fade" id="createCategoryModal" tabindex="-1" aria-labelledby="createCategoryModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -293,7 +333,6 @@
       </div>
     </div>
 
-    <!-- Edit Category Modal -->
     <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -333,7 +372,6 @@
       </div>
     </div>
 
-    <!-- Delete Category Modal -->
     <div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-labelledby="deleteCategoryModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -355,7 +393,7 @@
       </div>
     </div>
 
-    <!-- Limit Warning Modal -->
+
     <div class="modal fade" id="limitWarningModal" tabindex="-1" aria-labelledby="limitWarningModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content border-warning">
@@ -378,7 +416,6 @@
       </div>
     </div>
 
-    <!-- Limit Critical Modal -->
     <div class="modal fade" id="limitCriticalModal" tabindex="-1" aria-labelledby="limitCriticalModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content border-danger">
@@ -451,7 +488,13 @@ export default {
       type: 'income'
     })
 
-    // Computed
+    const filterType = ref('all')
+    const filterCategory = ref('all')
+    const filterMinAmount = ref('')
+    const filterMaxAmount = ref('')
+    const sortBy = ref('date-desc')
+
+    
     const incomeCategories = computed(() => {
       return categories.value.filter(cat => cat.type === 'income')
     })
@@ -476,11 +519,54 @@ export default {
       return totalIncome.value - totalExpenses.value
     })
 
-    // API Methods
+    
+    const filteredAndSortedTransactions = computed(() => {
+      let filtered = [...allTransactions.value]
+
+      if (filterType.value !== 'all') {
+        filtered = filtered.filter(t => t.type === filterType.value)
+      }
+
+      if (filterCategory.value !== 'all') {
+        filtered = filtered.filter(t => t.category_id == filterCategory.value)
+      }
+
+      if (filterMinAmount.value !== '') {
+        const min = parseFloat(filterMinAmount.value)
+        filtered = filtered.filter(t => parseFloat(t.amount) >= min)
+      }
+      if (filterMaxAmount.value !== '') {
+        const max = parseFloat(filterMaxAmount.value)
+        filtered = filtered.filter(t => parseFloat(t.amount) <= max)
+      }
+
+    
+      if (sortBy.value === 'date-desc') {
+        filtered.sort((a, b) => {
+          const dateCompare = new Date(b.date) - new Date(a.date)
+          if (dateCompare !== 0) return dateCompare
+          return b.id - a.id
+        })
+      } else if (sortBy.value === 'date-asc') {
+        filtered.sort((a, b) => {
+          const dateCompare = new Date(a.date) - new Date(b.date)
+          if (dateCompare !== 0) return dateCompare
+          return a.id - b.id
+        })
+      } else if (sortBy.value === 'amount-desc') {
+        filtered.sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
+      } else if (sortBy.value === 'amount-asc') {
+        filtered.sort((a, b) => parseFloat(a.amount) - parseFloat(b.amount))
+      }
+
+      return filtered
+    })
+
+   
     async function loadAllTransactions() {
       loading.value = true
       try {
-        // Load all transactions in a single call
+        
         const response = await fetch('/backend/api/transaction-api/transaction-get-all-api.php', {
           method: 'GET',
           headers: {
@@ -493,11 +579,11 @@ export default {
         if (data.success) {
           const transactions = data.transactions || []
           
-          // Separate income and expenses
+          
           incomeList.value = transactions.filter(t => t.type === 'income')
           expenseList.value = transactions.filter(t => t.type === 'expense')
           
-          // Sort all transactions by date
+          
           allTransactions.value = transactions.sort((a, b) => {
             const dateCompare = new Date(b.date) - new Date(a.date)
             if (dateCompare !== 0) return dateCompare
@@ -624,7 +710,7 @@ export default {
         loading.value = false
       }
     }
-
+//  Delete Transaction
     async function deleteTransaction(id, type) {
       if (!confirm('Are you sure you want to delete this transaction?')) return
 
@@ -665,7 +751,7 @@ export default {
         note: transaction.note || '',
         date: transaction.date
       }
-      // Open Bootstrap modal
+      
       const modal = new window.bootstrap.Modal(document.getElementById('editIncomeModal'))
       modal.show()
     }
@@ -710,7 +796,7 @@ export default {
         note: transaction.note || '',
         date: transaction.date
       }
-      // Open Bootstrap modal
+     
       const modal = new window.bootstrap.Modal(document.getElementById('editIncomeModal'))
       modal.show()
     }
@@ -737,7 +823,7 @@ export default {
 
         if (data.success) {
           successMessage.value = 'Transaction updated successfully!'
-          // Close modal
+          
           const modal = window.bootstrap.Modal.getInstance(document.getElementById('editIncomeModal'))
           modal.hide()
           editingId.value = null
@@ -894,7 +980,7 @@ export default {
       }
     }
 
-    // Load data on mount
+    
     onMounted(async () => {
       loginStore.loadJwt()
       if (!loginStore.jwt) {
@@ -921,9 +1007,15 @@ export default {
       newCategory,
       newCategoryType,
       editCategoryData,
+      filterType,
+      filterCategory,
+      filterMinAmount,
+      filterMaxAmount,
+      sortBy,
       incomeCategories,
       filteredCategories,
       editFilteredCategories,
+      filteredAndSortedTransactions,
       totalIncome,
       totalExpenses,
       balance,
