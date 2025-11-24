@@ -1,44 +1,49 @@
 <?php
-    header('Content-Type: application/json');
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: POST');
-    header('Access-Control-Allow-Headers: Content-Type');
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Headers: Content-Type');
 
-    // Handle preflight request
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        http_response_code(200);
-        exit();
-    }
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit();
 
-    require_once __DIR__ . '/../../class/class-auth.php';
+require_once __DIR__ . '/../../class/class-auth.php';
+require_once __DIR__ . '/../../class/class-rate-limiter.php';
 
-    // Get JSON input
-    $input = json_decode(file_get_contents('php://input'), true);
+$ip = $_SERVER['REMOTE_ADDR'];
+$endpoint = "user_registration";
 
-    // Validate JSON input
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Invalid JSON data'
-        ]);
-        exit();
-    }
+$rateLimiter = new RateLimiter();
 
-    // Extract parameters
-    $username = $input['username'] ?? '';
-    $email = $input['email'] ?? '';
-    $password = $input['password'] ?? '';
+$input = json_decode(file_get_contents('php://input'), true);
+$username = $input['username'] ?? '';
+$email    = $input['email'] ?? '';
+$password = $input['password'] ?? '';
 
-    // Create Auth instance and register user
-    $auth = new Auth();
-    $result = $auth->registerUser($username, $email, $password);
+// Check if banned
+if ($rateLimiter->isBlocked($ip, $endpoint)) {
+    $rateLimiter->registerAttempt($ip, $endpoint, null);
+    http_response_code(429);
+    echo json_encode(['success'=>false,'message'=>'Too many registration attempts. Try later.']);
+    exit();
+}
 
-    if ($result['success']) {
-        http_response_code(201);
-    } else {
-        http_response_code(400);
-    }
 
-    echo json_encode($result);
-?>
+// Attempt registration
+$auth = new Auth();
+$result = $auth->registerUser($username, $email, $password);
+
+// Determine user_id if registration successful
+$userId = $result['success'] ? ($result['user_id'] ?? null) : null;
+
+// Log attempt (always)
+$rateLimiter->registerAttempt($ip, $endpoint, $userId);
+
+// Check sliding window & ban if needed
+if (!$rateLimiter->checkLimit($ip, $endpoint, $userId)) {
+    http_response_code(429);
+    echo json_encode(['success'=>false,'message'=>'Too many attempts. Please wait.']);
+    exit();
+}
+
+http_response_code($result['success'] ? 201 : 400);
+echo json_encode($result);

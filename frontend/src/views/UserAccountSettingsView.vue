@@ -1,6 +1,6 @@
 <template>
-  <div class="bg-light min-vh-100">
-    <div class="container py-5">
+  <div class="bg-light min-vh-100 d-flex flex-column">
+    <div class="container py-5 flex-grow-1">
       <div class="row justify-content-center">
         <div class="col-lg-8">
           <div class="card shadow-sm border-0">
@@ -18,6 +18,32 @@
               <div v-if="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
                 {{ errorMessage }}
                 <button type="button" class="btn-close" @click="errorMessage = ''"></button>
+              </div>
+
+              <!-- Profile Picture -->
+              <div class="mb-4 text-center">
+                <div class="position-relative d-inline-block">
+                  <img 
+                    v-if="profileImageUrl" 
+                    :src="profileImageUrl + '?t=' + cacheBuster" 
+                    class="rounded-circle mb-2 border border-2 border-primary" 
+                    width="120" height="120" 
+                    alt="Profile Picture"
+                  />
+                  <div v-else class="rounded-circle bg-secondary d-flex align-items-center justify-content-center mb-2" style="width:120px;height:120px;">
+                    <i class="bi bi-person-fill text-white fs-2"></i>
+                  </div>
+                </div>
+
+                <div class="d-flex justify-content-center gap-2 mt-2">
+                  <label class="btn btn-outline-primary mb-0">
+                    <i class="bi bi-upload me-1"></i> Browse
+                    <input type="file" accept="image/*" @change="onProfilePictureSelected" class="d-none"/>
+                  </label>
+                  <button v-if="profileImageUrl" @click="deleteProfilePicture" class="btn btn-outline-danger">
+                    <i class="bi bi-trash me-1"></i> Delete
+                  </button>
+                </div>
               </div>
 
               <!-- Profile Information -->
@@ -197,7 +223,12 @@ export default {
     const deleteForm = ref({ password: '' })
     const allLimits = ref([])
     const limitsEnabled = ref(false)
-    const userToggled = ref(false) // track if user clicked toggle
+    const userToggled = ref(false)
+
+    // Profile picture
+    const profileImageUrl = ref('')
+    const cacheBuster = ref(Date.now())
+    const BACKEND_URL = 'http://localhost/personal-finance-tracker/backend'
 
     async function loadProfile() {
       try {
@@ -213,10 +244,80 @@ export default {
           errorMessage.value = 'Failed to load profile'
           setTimeout(() => errorMessage.value = '', 3000)
         }
-      } catch (err) { 
+      } catch (err) {
         console.error(err)
         errorMessage.value = 'Network error loading profile'
         setTimeout(() => errorMessage.value = '', 3000)
+      }
+
+      await loadProfilePicture()
+    }
+
+    async function loadProfilePicture() {
+      try {
+        const res = await fetch(BACKEND_URL + '/api/user-api/user-get-profile-picture-api.php', {
+          headers: { 'Auth': `Bearer ${loginStore.jwt}` }
+        })
+        const data = await res.json()
+        if (data.success && data.exists) {
+          profileImageUrl.value = BACKEND_URL + data.url
+          cacheBuster.value = Date.now()
+        } else {
+          profileImageUrl.value = ''
+        }
+      } catch(err) {
+        console.error(err)
+      }
+    }
+
+    async function onProfilePictureSelected(event) {
+      const file = event.target.files[0]
+      if (!file) return
+
+      profileImageUrl.value = URL.createObjectURL(file)
+      cacheBuster.value = Date.now()
+
+      const formData = new FormData()
+      formData.append('profile_picture', file)
+
+      try {
+        const res = await fetch(BACKEND_URL + '/api/user-api/user-upload-profile-picture-api.php', {
+          method: 'POST',
+          headers: { 'Auth': `Bearer ${loginStore.jwt}` },
+          body: formData
+        })
+        const data = await res.json()
+        if (!data.success) {
+          errorMessage.value = data.message
+          setTimeout(()=>errorMessage.value='',3000)
+        } else {
+          successMessage.value = 'Profile picture uploaded!'
+          profileImageUrl.value = BACKEND_URL + data.url
+          cacheBuster.value = Date.now()
+          setTimeout(()=>successMessage.value='',3000)
+        }
+      } catch(err) {
+        errorMessage.value='Upload failed'
+        setTimeout(()=>errorMessage.value='',3000)
+      }
+    }
+
+    async function deleteProfilePicture() {
+      try {
+        const res = await fetch(BACKEND_URL + '/api/user-api/user-delete-profile-picture-api.php', {
+          method:'POST',
+          headers:{ 'Auth':`Bearer ${loginStore.jwt}` }
+        })
+        const data = await res.json()
+        if(data.success) {
+          profileImageUrl.value=''
+          cacheBuster.value = Date.now()
+          successMessage.value='Profile picture deleted'
+          setTimeout(()=>successMessage.value='',3000)
+        }
+      } catch(err) {
+        errorMessage.value='Failed to delete profile picture'
+        setTimeout(()=>errorMessage.value='',3000)
       }
     }
 
@@ -228,28 +329,20 @@ export default {
         const data = await res.json()
         if (data.success && data.limit && data.limit.length > 0) {
           allLimits.value = Array.isArray(data.limit) ? data.limit : [data.limit]
-          
-          // Get the first limit (there should only be one per user)
           const userLimit = allLimits.value[0]
-          
           if (userLimit) {
-            // Always store the limit_id regardless of enabled status
             limitForm.value.limit_id = userLimit.limit_id
-            
-            // Set toggle and form values based on enabled status
             if (userLimit.enabled) {
               limitsEnabled.value = true
               limitForm.value.warning_limit = userLimit.warning_limit
               limitForm.value.critical_limit = userLimit.critical_limit
             } else {
               limitsEnabled.value = false
-              // Keep limit_id but clear the values when disabled
               limitForm.value.warning_limit = ''
               limitForm.value.critical_limit = ''
             }
           }
         } else {
-          // No limits exist at all - reset everything
           limitsEnabled.value = false
           limitForm.value = { limit_id: null, warning_limit: '', critical_limit: '' }
         }
@@ -259,7 +352,6 @@ export default {
     async function updateLimitsToggle() {
       userToggled.value = true
       try {
-        // Only call the API if there's a limit_id to toggle (i.e., a limit already exists)
         if (limitForm.value.limit_id) {
           const res = await fetch(`/backend/api/limit-api/toggle-limit-api.php`, {
             method: 'POST',
@@ -273,11 +365,9 @@ export default {
           if (!data.success) throw new Error(data.message)
           await loadLimits()
         } else {
-          // No existing limit - if toggling off, just clear the form
           if (!limitsEnabled.value) {
             limitForm.value = { limit_id: null, warning_limit: '', critical_limit: '' }
           }
-          // If toggling on with no existing limit, just show the form - user will create it by clicking Save Limits
         }
       } catch (err) {
         errorMessage.value = 'Failed to update toggle'
@@ -324,9 +414,9 @@ export default {
       try {
         const res = await fetch('/backend/api/user-api/user-update-profile-api.php', {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}` 
+            'Auth': `Bearer ${loginStore.jwt}`
           },
           body: JSON.stringify({
             username: profileForm.value.name,
@@ -342,7 +432,7 @@ export default {
           errorMessage.value = data.message || 'Failed to update profile'
           setTimeout(() => errorMessage.value = '', 3000)
         }
-      } catch (err) { 
+      } catch (err) {
         console.error(err)
         errorMessage.value = 'Network error updating profile'
         setTimeout(() => errorMessage.value = '', 3000)
@@ -351,10 +441,23 @@ export default {
     }
 
     async function updatePassword() {
-      if(passwordForm.value.newPassword !== passwordForm.value.confirmPassword){errorMessage.value='New passwords do not match'; setTimeout(()=>errorMessage.value='',3000); return}
+      if(passwordForm.value.newPassword !== passwordForm.value.confirmPassword){
+        errorMessage.value='New passwords do not match'
+        setTimeout(()=>errorMessage.value='',3000)
+        return
+      }
       loadingPassword.value=true
-      try{await new Promise(r=>setTimeout(r,1000)); successMessage.value='Password updated successfully!'; passwordForm.value={currentPassword:'',newPassword:'',confirmPassword:''}; setTimeout(()=>successMessage.value='',3000)}
-      catch{errorMessage.value='Failed to update password'} finally{loadingPassword.value=false}
+      try{
+        await new Promise(r=>setTimeout(r,1000))
+        successMessage.value='Password updated successfully!'
+        passwordForm.value={currentPassword:'',newPassword:'',confirmPassword:''}
+        setTimeout(()=>successMessage.value='',3000)
+      }
+      catch{
+        errorMessage.value='Failed to update password'
+      } finally{
+        loadingPassword.value=false
+      }
     }
 
     async function deleteAccount(){
@@ -402,6 +505,8 @@ export default {
     return {
       successMessage, errorMessage, loadingProfile, loadingPassword, loadingLimit, loadingDelete, showDeleteModal,
       profileForm, passwordForm, limitForm, deleteForm, allLimits, limitsEnabled,
+      profileImageUrl, cacheBuster,
+      onProfilePictureSelected, deleteProfilePicture,
       updateProfile, updatePassword, submitLimit, deleteAccount, updateLimitsToggle
     }
   }
@@ -409,5 +514,5 @@ export default {
 </script>
 
 <style scoped>
-.modal.show { background-color: rgba(0, 0, 0, 0.5); }
+.modal.show { background-color: rgba(0,0,0,0.5); }
 </style>

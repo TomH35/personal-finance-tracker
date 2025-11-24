@@ -1,38 +1,47 @@
 <?php
-    header('Content-Type: application/json');
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: POST');
-    header('Access-Control-Allow-Headers: Content-Type');
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Headers: Content-Type');
 
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        http_response_code(200);
-        exit();
-    }
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit();
 
-    require_once __DIR__ . '/../../class/class-auth.php';
+require_once __DIR__ . '/../../class/class-auth.php';
+require_once __DIR__ . '/../../class/class-rate-limiter.php';
 
-    $input = json_decode(file_get_contents('php://input'), true);
+$ip = $_SERVER['REMOTE_ADDR'];
+$endpoint = "user_login";
 
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Invalid JSON data'
-        ]);
-        exit();
-    }
+$rateLimiter = new RateLimiter();
 
-    $identifier = $input['identifier'] ?? ''; // email or username
-    $password = $input['password'] ?? '';
+$input = json_decode(file_get_contents('php://input'), true);
+$identifier = $input['identifier'] ?? '';
+$password   = $input['password'] ?? '';
 
-    $auth = new Auth();
-    $result = $auth->loginUser($identifier, $password);
+// Check ban first
+if ($rateLimiter->isBlocked($ip, $endpoint)) {
+    $rateLimiter->registerAttempt($ip, $endpoint, null, null, $identifier);
+    http_response_code(429);
+    echo json_encode(['success'=>false,'message'=>'Too many login attempts. Try later.']);
+    exit();
+}
 
-    if ($result['success']) {
-        http_response_code(200);
-    } else {
-        http_response_code(401);
-    }
+// Attempt login
+$auth = new Auth();
+$result = $auth->loginUser($identifier, $password);
 
-    echo json_encode($result);
-?>
+// Determine user_id if login successful
+$userId = $result['success'] ? ($result['user_id'] ?? null) : null;
+
+// Log the attempt (always)
+$rateLimiter->registerAttempt($ip, $endpoint, $userId, null, $identifier);
+
+// Check sliding window limit
+if (!$rateLimiter->checkLimit($ip, $endpoint, $userId, $identifier)) {
+    http_response_code(429);
+    echo json_encode(['success'=>false,'message'=>'Too many attempts. Please wait.']);
+    exit();
+}
+
+http_response_code($result['success'] ? 200 : 401);
+echo json_encode($result);
