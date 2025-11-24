@@ -10,13 +10,13 @@
               <h6 class="fw-semibold mb-3">Summary</h6>
               <ul class="list-group list-group-flush">
                 <li class="list-group-item d-flex justify-content-between">
-                  Income <span class="badge bg-success">${{ totalIncome.toFixed(2) }}</span>
+                  Income <span class="badge bg-success">{{ currencySymbol }}{{ totalIncome.toFixed(2) }}</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
-                  Expenses <span class="badge bg-danger">${{ totalExpenses.toFixed(2) }}</span>
+                  Expenses <span class="badge bg-danger">{{ currencySymbol }}{{ totalExpenses.toFixed(2) }}</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
-                  Balance <span class="badge" :class="balance >= 0 ? 'bg-primary' : 'bg-warning'">${{ balance.toFixed(2) }}</span>
+                  Balance <span class="badge" :class="balance >= 0 ? 'bg-primary' : 'bg-warning'">{{ currencySymbol }}{{ balance.toFixed(2) }}</span>
                 </li>
               </ul>
             </div>
@@ -198,7 +198,7 @@
                       <td>{{ transaction.category_name }}</td>
                       <td>{{ transaction.note || '-' }}</td>
                       <td class="text-end fw-bold" :class="transaction.type === 'income' ? 'text-success' : 'text-danger'">
-                        {{ transaction.type === 'income' ? '+' : '-' }}${{ parseFloat(transaction.amount).toFixed(2) }}
+                        {{ transaction.type === 'income' ? '+' : '-' }}{{ currencySymbol }}{{ convertCurrency(parseFloat(transaction.amount)).toFixed(2) }}
                       </td>
                       <td class="text-end">
                         <button 
@@ -405,7 +405,7 @@
           </div>
           <div class="modal-body">
             <p class="mb-0">
-              Your monthly expenses are approaching the warning limit of <strong>${{ warningLimit }}</strong>.
+              Your monthly expenses are approaching the warning limit of <strong>{{ currencySymbol }}{{ convertCurrency(warningLimit).toFixed(2) }}</strong>.
               We recommend monitoring your expenses and considering reducing them.
             </p>
           </div>
@@ -427,7 +427,7 @@
           </div>
           <div class="modal-body">
             <p class="mb-0">
-              <strong>Warning!</strong> Your monthly expenses have exceeded the critical limit of <strong>${{ criticalLimit }}</strong>.
+              <strong>Warning!</strong> Your monthly expenses have exceeded the critical limit of <strong>{{ currencySymbol }}{{ convertCurrency(criticalLimit).toFixed(2) }}</strong>.
               We strongly recommend reviewing your expenses immediately!
             </p>
           </div>
@@ -465,6 +465,33 @@ export default {
     const warningLimit = ref(0)
     const criticalLimit = ref(0)
     const limitsEnabled = ref(false)
+
+    // Currency state
+    const userCurrency = ref('USD')
+    const currencySymbols = {
+      'USD': '$',
+      'EUR': '€',
+      'PLN': 'zł',
+      'CZK': 'Kč'
+    }
+    
+    // Exchange rates (as of November 15, 2025) - base currency: USD
+    const exchangeRates = {
+      'USD': 1.0,
+      'EUR': 0.92,      // 1 USD = 0.92 EUR
+      'PLN': 4.05,      // 1 USD = 4.05 PLN
+      'CZK': 23.15      // 1 USD = 23.15 CZK
+    }
+    
+    const currencySymbol = computed(() => {
+      return currencySymbols[userCurrency.value] || '$'
+    })
+    
+    // Convert amount from USD to user's selected currency
+    const convertCurrency = (amountInUSD) => {
+      const rate = exchangeRates[userCurrency.value] || 1.0
+      return amountInUSD * rate
+    }
 
     const formData = ref({
       type: 'income',
@@ -508,11 +535,13 @@ export default {
     })
     
     const totalIncome = computed(() => {
-      return incomeList.value.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      const sum = incomeList.value.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      return convertCurrency(sum)
     })
 
     const totalExpenses = computed(() => {
-      return expenseList.value.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      const sum = expenseList.value.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      return convertCurrency(sum)
     })
 
     const balance = computed(() => {
@@ -980,7 +1009,22 @@ export default {
       }
     }
 
-    
+    // Load user profile to get currency
+    async function loadUserProfile() {
+      try {
+        const res = await fetch('/backend/api/user-api/user-get-profile-api.php', {
+          headers: { 'Auth': `Bearer ${loginStore.jwt}` }
+        })
+        const data = await res.json()
+        if (data.success && data.user) {
+          userCurrency.value = data.user.currency || 'USD'
+        }
+      } catch (err) { 
+        console.error('Failed to load user profile:', err)
+      }
+    }
+
+    // Load data on mount
     onMounted(async () => {
       loginStore.loadJwt()
       if (!loginStore.jwt) {
@@ -988,6 +1032,7 @@ export default {
         return
       }
 
+      await loadUserProfile()
       await loadCategories()
       await loadAllTransactions()
       await loadLimits()
@@ -1023,6 +1068,9 @@ export default {
       warningLimit,
       criticalLimit,
       limitsEnabled,
+      userCurrency,
+      currencySymbol,
+      convertCurrency,
       loadTransactions,
       loadAllTransactions,
       addTransaction,
