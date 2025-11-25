@@ -179,6 +179,80 @@ class User
         }
     }
 
+    public function changePassword($user_id, $currentPassword, $newPassword)
+    {
+        try {
+            // Basic validation
+            if (empty($newPassword) || strlen($newPassword) < 6) {
+                return [
+                    'success' => false,
+                    'message' => 'New password must be at least 6 characters long'
+                ];
+            }
+
+            // Fetch current password hash
+            $stmt = $this->db->prepare("SELECT password_hash FROM users WHERE user_id = :user_id LIMIT 1");
+            $stmt->execute(['user_id' => $user_id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found'
+                ];
+            }
+
+            $currentHash = $row['password_hash'] ?? null;
+
+            // If currentPassword provided, verify it
+            if (!empty($currentPassword)) {
+                if (empty($currentHash) || !password_verify($currentPassword, $currentHash)) {
+                    return [
+                        'success' => false,
+                        'message' => 'Current password is incorrect'
+                    ];
+                }
+            }
+
+            // Hash new password
+            $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+
+            // Update password and updated_at explicitly
+            $updateStmt = $this->db->prepare("
+                UPDATE users
+                SET password_hash = :password_hash, updated_at = NOW()
+                WHERE user_id = :user_id
+            ");
+            $updateStmt->execute([
+                'password_hash' => $newHash,
+                'user_id' => $user_id
+            ]);
+
+            if ($updateStmt->rowCount() === 0) {
+                // It's possible the update didn't change rows (rare), but treat as success if no error
+                return [
+                    'success' => true,
+                    'message' => 'Password updated successfully'
+                ];
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Password updated successfully'
+            ];
+        } catch (PDOException $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to update password: ' . $e->getMessage()
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Unexpected error: ' . $e->getMessage()
+            ];
+        }
+    }
+
     public function deleteOwnAccount($user_id)
     {
         try {
@@ -227,7 +301,6 @@ class User
             mkdir($this->imageDir, 0755, true);
         }
 
-        // odstránenie starého obrázka
         $this->deleteProfilePicture($user_id);
 
         $fileName = "user_{$user_id}.{$ext}";
