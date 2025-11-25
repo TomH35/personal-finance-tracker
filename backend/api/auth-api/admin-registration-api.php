@@ -25,13 +25,25 @@
         exit();
     }
 
+    // Check authentication - only admins can create new admins
+    $auth = new Auth();
+    
+    // Get JWT from Authorization header
+    $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
+    
+    if (!$auth->isAdmin($jwt)) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Unauthorized: Admin access required'
+        ]);
+        exit();
+    }
+
     // Extract parameters
     $username = $input['username'] ?? '';
     $email = $input['email'] ?? '';
     $password = $input['password'] ?? '';
-
-    // Create Auth instance
-    $auth = new Auth();
 
     // Register as admin (role = 'admin')
     $result = $auth->registerUser($username, $email, $password, 'admin');
