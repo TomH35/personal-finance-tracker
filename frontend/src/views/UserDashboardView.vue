@@ -395,7 +395,7 @@
 
 
     <div class="modal fade" id="limitWarningModal" tabindex="-1" aria-labelledby="limitWarningModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
+      <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-warning">
           <div class="modal-header bg-warning text-dark">
             <h5 class="modal-title" id="limitWarningModalLabel">
@@ -404,8 +404,12 @@
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
+            <p class="mb-2">
+              Your monthly expenses of <strong>{{ currencySymbol }}{{ convertCurrency(currentExpenseAmount).toFixed(2) }}</strong> 
+              have exceeded the warning limit of <strong>{{ currencySymbol }}{{ convertCurrency(warningLimit).toFixed(2) }}</strong> 
+              by <strong class="text-warning">{{ currencySymbol }}{{ convertCurrency(limitOverage).toFixed(2) }}</strong>.
+            </p>
             <p class="mb-0">
-              Your monthly expenses are approaching the warning limit of <strong>{{ currencySymbol }}{{ convertCurrency(warningLimit).toFixed(2) }}</strong>.
               We recommend monitoring your expenses and considering reducing them.
             </p>
           </div>
@@ -417,7 +421,7 @@
     </div>
 
     <div class="modal fade" id="limitCriticalModal" tabindex="-1" aria-labelledby="limitCriticalModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
+      <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-danger">
           <div class="modal-header bg-danger text-white">
             <h5 class="modal-title" id="limitCriticalModalLabel">
@@ -426,8 +430,12 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
+            <p class="mb-2">
+              <strong>Warning!</strong> Your monthly expenses of <strong>{{ currencySymbol }}{{ convertCurrency(currentExpenseAmount).toFixed(2) }}</strong> 
+              have exceeded the critical limit of <strong>{{ currencySymbol }}{{ convertCurrency(criticalLimit).toFixed(2) }}</strong> 
+              by <strong class="text-danger">{{ currencySymbol }}{{ convertCurrency(limitOverage).toFixed(2) }}</strong>!
+            </p>
             <p class="mb-0">
-              <strong>Warning!</strong> Your monthly expenses have exceeded the critical limit of <strong>{{ currencySymbol }}{{ convertCurrency(criticalLimit).toFixed(2) }}</strong>.
               We strongly recommend reviewing your expenses immediately!
             </p>
           </div>
@@ -465,6 +473,10 @@ export default {
     const warningLimit = ref(0)
     const criticalLimit = ref(0)
     const limitsEnabled = ref(false)
+    const limitOverage = ref(0)
+    const currentExpenseAmount = ref(0)
+    const warningShownThisSession = ref(false)
+    const criticalShownThisSession = ref(false)
 
     // Currency state
     const userCurrency = ref('USD')
@@ -546,6 +558,23 @@ export default {
 
     const balance = computed(() => {
       return totalIncome.value - totalExpenses.value
+    })
+
+    // Calculate current month expenses in USD for limit checking
+    const currentMonthExpensesUSD = computed(() => {
+      const now = new Date()
+      const currentMonth = now.getMonth()
+      const currentYear = now.getFullYear()
+      
+      const monthExpenses = expenseList.value.filter(expense => {
+        const expenseDate = new Date(expense.date)
+        return expenseDate.getMonth() === currentMonth && 
+               expenseDate.getFullYear() === currentYear
+      })
+      
+      const total = monthExpenses.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      console.log('Current month expenses (USD):', total, 'from', monthExpenses.length, 'transactions')
+      return total
     })
 
     
@@ -675,11 +704,19 @@ export default {
           }
         })
         const data = await response.json()
-        if (data.success && data.limit) {
-          limits.value = data.limit
-          warningLimit.value = parseFloat(data.limit.warning_limit) || 0
-          criticalLimit.value = parseFloat(data.limit.critical_limit) || 0
-          limitsEnabled.value = data.limit.enabled === '1' || data.limit.enabled === 1
+        if (data.success && data.limit && data.limit.length > 0) {
+          // Backend returns an array, get the first (most recent) limit
+          const limitData = data.limit[0]
+          limits.value = limitData
+          warningLimit.value = parseFloat(limitData.warning_limit) || 0
+          criticalLimit.value = parseFloat(limitData.critical_limit) || 0
+          limitsEnabled.value = limitData.enabled === '1' || limitData.enabled === 1
+          
+          console.log('Limits loaded:', {
+            warning: warningLimit.value,
+            critical: criticalLimit.value,
+            enabled: limitsEnabled.value
+          })
         }
       } catch (err) {
         console.error('Failed to load limits:', err)
@@ -687,14 +724,42 @@ export default {
     }
 
     function checkLimits(monthlyExpenses) {
-      if (!limitsEnabled.value) return
+      console.log('Checking limits:', {
+        monthlyExpenses,
+        warningLimit: warningLimit.value,
+        criticalLimit: criticalLimit.value,
+        enabled: limitsEnabled.value
+      })
+      
+      if (!limitsEnabled.value) {
+        console.log('Limits are disabled')
+        return
+      }
 
+      currentExpenseAmount.value = monthlyExpenses
+
+      // Check critical first - if critical is exceeded, only show critical modal
       if (monthlyExpenses >= criticalLimit.value) {
-        const modal = new window.bootstrap.Modal(document.getElementById('limitCriticalModal'))
-        modal.show()
+        if (!criticalShownThisSession.value) {
+          limitOverage.value = monthlyExpenses - criticalLimit.value
+          console.log('Critical limit reached! Over by:', limitOverage.value)
+          criticalShownThisSession.value = true
+          const modal = new window.bootstrap.Modal(document.getElementById('limitCriticalModal'))
+          modal.show()
+        }
       } else if (monthlyExpenses >= warningLimit.value) {
-        const modal = new window.bootstrap.Modal(document.getElementById('limitWarningModal'))
-        modal.show()
+        if (!warningShownThisSession.value) {
+          limitOverage.value = monthlyExpenses - warningLimit.value
+          console.log('Warning limit reached! Over by:', limitOverage.value)
+          warningShownThisSession.value = true
+          const modal = new window.bootstrap.Modal(document.getElementById('limitWarningModal'))
+          modal.show()
+        }
+      } else {
+        console.log('Within limits')
+        // Reset flags if user goes back under the limits
+        warningShownThisSession.value = false
+        criticalShownThisSession.value = false
       }
     }
 
@@ -719,6 +784,7 @@ export default {
 
         if (data.success) {
           successMessage.value = 'Transaction added successfully!'
+          const wasExpense = formData.value.type === 'expense'
           formData.value = {
             type: 'income',
             amount: '',
@@ -727,6 +793,12 @@ export default {
             date: new Date().toISOString().split('T')[0]
           }
           await loadAllTransactions()
+          
+          // Check limits after adding expense
+          if (wasExpense) {
+            checkLimits(currentMonthExpensesUSD.value)
+          }
+          
           setTimeout(() => successMessage.value = '', 3000)
         } else {
           errorMessage.value = data.message || 'Failed to add transaction'
@@ -758,6 +830,7 @@ export default {
         if (data.success) {
           successMessage.value = 'Transaction deleted successfully!'
           await loadAllTransactions()
+          checkLimits(currentMonthExpensesUSD.value)
           setTimeout(() => successMessage.value = '', 3000)
         } else {
           errorMessage.value = data.message || 'Failed to delete transaction'
@@ -857,6 +930,7 @@ export default {
           modal.hide()
           editingId.value = null
           await loadAllTransactions()
+          checkLimits(currentMonthExpensesUSD.value)
           setTimeout(() => successMessage.value = '', 3000)
         } else {
           errorMessage.value = data.message || 'Failed to update transaction'
@@ -1068,6 +1142,9 @@ export default {
       warningLimit,
       criticalLimit,
       limitsEnabled,
+      limitOverage,
+      currentExpenseAmount,
+      currentMonthExpensesUSD,
       userCurrency,
       currencySymbol,
       convertCurrency,

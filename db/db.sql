@@ -98,7 +98,7 @@ CREATE TABLE rate_limits (
     user_id INT NULL,                             	-- Linked user (if known)
     endpoint VARCHAR(100) NOT NULL,               	-- API endpoint (login/register)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Attempt timestamp
-    blocked_until TIMESTAMP NULL                  	-- Ban expiry timestamp (if blocked)
+    blocked_until TIMESTAMP NULL,                  	-- Ban expiry timestamp (if blocked)
     require_captcha TINYINT(1) DEFAULT 0          -- Whether captcha is required for this attempt
 );
 
