@@ -87,21 +87,36 @@
                   <div class="row g-3">
                     <div class="col-md-4">
                       <label class="form-label">Current Password</label>
-                      <input type="password" v-model="passwordForm.currentPassword" class="form-control" placeholder="••••••••" required />
+                      <div class="input-group">
+                        <input :type="showCurrentPassword ? 'text' : 'password'" v-model="passwordForm.currentPassword" class="form-control" placeholder="••••••••" required />
+                        <button type="button" class="btn btn-outline-secondary" @click="showCurrentPassword = !showCurrentPassword">
+                          <i :class="showCurrentPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                        </button>
+                      </div>
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">New Password</label>
-                      <input type="password" v-model="passwordForm.newPassword" class="form-control" placeholder="New password" required />
+                      <div class="input-group">
+                        <input :type="showNewPassword ? 'text' : 'password'" v-model="passwordForm.newPassword" class="form-control" placeholder="New password" required />
+                        <button type="button" class="btn btn-outline-secondary" @click="showNewPassword = !showNewPassword">
+                          <i :class="showNewPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                        </button>
+                      </div>
                     </div>
                     <div class="col-md-4">
                       <label class="form-label">Confirm Password</label>
-                      <input type="password" v-model="passwordForm.confirmPassword" class="form-control" placeholder="Confirm password" required />
+                      <div class="input-group">
+                        <input :type="showConfirmPassword ? 'text' : 'password'" v-model="passwordForm.confirmPassword" class="form-control" placeholder="Confirm password" required />
+                        <button type="button" class="btn btn-outline-secondary" @click="showConfirmPassword = !showConfirmPassword">
+                          <i :class="showConfirmPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div class="text-end mt-3">
                     <button type="submit" class="btn btn-outline-primary" :disabled="loadingPassword">
                       <span v-if="loadingPassword" class="spinner-border spinner-border-sm me-2"></span>
-                      Update Password
+                      Change Password
                     </button>
                   </div>
                 </form>
@@ -229,6 +244,10 @@ export default {
     const profileImageUrl = ref('')
     const cacheBuster = ref(Date.now())
     const BACKEND_URL = 'http://localhost/personal-finance-tracker/backend'
+
+    const showCurrentPassword = ref(false)
+    const showNewPassword = ref(false)
+    const showConfirmPassword = ref(false)
 
     async function loadProfile() {
       try {
@@ -441,22 +460,52 @@ export default {
     }
 
     async function updatePassword() {
-      if(passwordForm.value.newPassword !== passwordForm.value.confirmPassword){
-        errorMessage.value='New passwords do not match'
-        setTimeout(()=>errorMessage.value='',3000)
+      if (!passwordForm.value.newPassword || passwordForm.value.newPassword.length < 6) {
+        errorMessage.value = 'New password must be at least 6 characters'
+        setTimeout(() => errorMessage.value = '', 3000)
         return
       }
-      loadingPassword.value=true
-      try{
-        await new Promise(r=>setTimeout(r,1000))
-        successMessage.value='Password updated successfully!'
-        passwordForm.value={currentPassword:'',newPassword:'',confirmPassword:''}
-        setTimeout(()=>successMessage.value='',3000)
+
+      if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+        errorMessage.value = 'Passwords do not match'
+        setTimeout(() => errorMessage.value = '', 3000)
+        return
       }
-      catch{
-        errorMessage.value='Failed to update password'
-      } finally{
-        loadingPassword.value=false
+
+      loadingPassword.value = true
+      errorMessage.value = ''
+      successMessage.value = ''
+
+      try {
+        const res = await fetch('/backend/api/user-api/user-change-password-api.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Auth': `Bearer ${loginStore.jwt}`
+          },
+          body: JSON.stringify({
+            currentPassword: passwordForm.value.currentPassword,
+            newPassword: passwordForm.value.newPassword,
+            confirmPassword: passwordForm.value.confirmPassword
+          })
+        })
+
+        const data = await res.json()
+
+        if (data.success) {
+          successMessage.value = 'Password updated successfully!'
+          passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
+          setTimeout(() => successMessage.value = '', 3000)
+        } else {
+          errorMessage.value = data.message || 'Failed to update password'
+          setTimeout(() => errorMessage.value = '', 3000)
+        }
+      } catch (err) {
+        console.error(err)
+        errorMessage.value = 'Network error updating password'
+        setTimeout(() => errorMessage.value = '', 3000)
+      } finally {
+        loadingPassword.value = false
       }
     }
 
@@ -506,6 +555,7 @@ export default {
       successMessage, errorMessage, loadingProfile, loadingPassword, loadingLimit, loadingDelete, showDeleteModal,
       profileForm, passwordForm, limitForm, deleteForm, allLimits, limitsEnabled,
       profileImageUrl, cacheBuster,
+      showCurrentPassword, showNewPassword, showConfirmPassword,
       onProfilePictureSelected, deleteProfilePicture,
       updateProfile, updatePassword, submitLimit, deleteAccount, updateLimitsToggle
     }
@@ -516,3 +566,4 @@ export default {
 <style scoped>
 .modal.show { background-color: rgba(0,0,0,0.5); }
 </style>
+
