@@ -54,7 +54,6 @@ async function handleLoginClick(data) {
     startWaitTimer(60) // reset to 60s
     return
   }
-
   // First attempt or captcha_required
   const response = await fetch('/backend/api/auth-api/user-login-api.php', {
     method: 'POST',
@@ -65,6 +64,7 @@ async function handleLoginClick(data) {
 
   if (resData.success) {
     loginStore.setJwt(resData.token)
+    loginStore.setUserData(resData.user)
     router.push('/user-dashboard')
   } else {
     alertMessage.value = resData.message

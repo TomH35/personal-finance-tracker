@@ -47,6 +47,7 @@ const handleLogin = async (loginData) => {
 
       if (data.token) {
         loginStore.setJwt(data.token) // Save token to store and localStorage
+        loginStore.setUserData(data.user)
       }
 
       setTimeout(() => router.push('/admin-dashboard'), 2000)

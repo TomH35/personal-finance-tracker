@@ -17,7 +17,8 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
-// Load JWT from localStorage on app startup
+// Load JWT and userData from localStorage on app startup
 const loginStore = useLoginStore()
 loginStore.loadJwt()
+loginStore.loadUserData()
 app.mount('#app')
