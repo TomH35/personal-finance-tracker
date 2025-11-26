@@ -1,0 +1,45 @@
+services:
+    php:
+        build:
+            context: ./backend
+            dockerfile: Dockerfile
+        container_name: pft-php-server
+        #ports:
+        #    - "80:80"
+        #volumes:
+        #    - ./backend:/srv/personal-finance-tracker/backend
+        networks:
+            - pft-network
+        depends_on:
+            - mysql
+
+    frontend:
+        build:
+            context: ./frontend
+            dockerfile: Dockerfile
+        container_name: pft-vue-frontend
+        ports:
+            - "5173:5173"
+        #volumes:
+        #    - ./frontend:/app
+        #    - /app/node_modules
+        networks:
+            - pft-network
+        depends_on:
+            - php
+
+    mysql:
+        image: mysql:8.0
+        container_name: pft-MySQL
+        environment:
+            MYSQL_ROOT_PASSWORD: root
+        #ports:
+        #    - "3306:3306"
+        volumes:
+            - ./db/db.sql:/docker-entrypoint-initdb.d/init.sql
+        networks:
+            - pft-network
+
+networks:
+    pft-network:
+        driver: bridge
