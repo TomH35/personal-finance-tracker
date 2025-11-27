@@ -747,10 +747,10 @@ export default {
           console.log('Critical limit reached! Over by:', limitOverage.value)
           criticalShownThisSession.value = true
           
-          // Create notification
+          // Create notification with converted amounts
           notificationStore.addNotification(
             'critical',
-            `Critical limit exceeded! You've spent ${currencySymbol.value}${monthlyExpenses.toFixed(2)} (over by ${currencySymbol.value}${limitOverage.value.toFixed(2)})`
+            `Critical limit exceeded! You've spent ${currencySymbol.value}${convertCurrency(monthlyExpenses).toFixed(2)} (over by ${currencySymbol.value}${convertCurrency(limitOverage.value).toFixed(2)})`
           )
           
           const modal = new window.bootstrap.Modal(document.getElementById('limitCriticalModal'))
@@ -762,10 +762,10 @@ export default {
           console.log('Warning limit reached! Over by:', limitOverage.value)
           warningShownThisSession.value = true
           
-          // Create notification
+          // Create notification with converted amounts
           notificationStore.addNotification(
             'warning',
-            `Warning limit reached! You've spent ${currencySymbol.value}${monthlyExpenses.toFixed(2)} (over by ${currencySymbol.value}${limitOverage.value.toFixed(2)})`
+            `Warning limit reached! You've spent ${currencySymbol.value}${convertCurrency(monthlyExpenses).toFixed(2)} (over by ${currencySymbol.value}${convertCurrency(limitOverage.value).toFixed(2)})`
           )
           
           const modal = new window.bootstrap.Modal(document.getElementById('limitWarningModal'))
