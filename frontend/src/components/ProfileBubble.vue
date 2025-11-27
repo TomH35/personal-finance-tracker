@@ -124,8 +124,6 @@ const isOpen = ref(false)
 const profilePicture = ref(null)
 const userProfile = ref(null)
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || ''
-
 const notifications = computed(() => notificationStore.notifications)
 const unreadCount = computed(() => notificationStore.getUnreadCount())
 
@@ -213,7 +211,7 @@ const clearAllNotifications = () => {
 
 const fetchUserProfile = async () => {
   try {
-    const res = await fetch(BACKEND_URL + '/backend/api/user-api/user-get-profile-api.php', {
+    const res = await fetch('/backend/api/user-api/user-get-profile-api.php', {
       headers: {
         'Auth': `Bearer ${loginStore.jwt}`
       }
@@ -229,7 +227,7 @@ const fetchUserProfile = async () => {
 
 const fetchProfilePicture = async () => {
   try {
-    const res = await fetch(BACKEND_URL + '/backend/api/user-api/user-get-profile-picture-api.php', {
+    const res = await fetch('/backend/api/user-api/user-get-profile-picture-api.php', {
       headers: {
         'Auth': `Bearer ${loginStore.jwt}`
       }
@@ -237,7 +235,7 @@ const fetchProfilePicture = async () => {
     const data = await res.json()
     if (data.success && data.exists && data.url) {
       // Add timestamp to prevent caching
-      profilePicture.value = BACKEND_URL + '/backend' + data.url + '?t=' + Date.now()
+      profilePicture.value = '/backend' + data.url + '?t=' + Date.now()
     } else {
       profilePicture.value = null
     }
