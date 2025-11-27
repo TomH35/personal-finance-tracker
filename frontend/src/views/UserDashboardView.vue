@@ -450,6 +450,7 @@
 
 <script>
 import { useLoginStore } from '@/stores/loginStore'
+import { useNotificationStore } from '@/stores/notificationStore'
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -457,6 +458,7 @@ export default {
   name: 'UserDashboardView',
   setup() {
     const loginStore = useLoginStore()
+    const notificationStore = useNotificationStore()
     const router = useRouter()
 
     const incomeList = ref([])
@@ -744,6 +746,13 @@ export default {
           limitOverage.value = monthlyExpenses - criticalLimit.value
           console.log('Critical limit reached! Over by:', limitOverage.value)
           criticalShownThisSession.value = true
+          
+          // Create notification with converted amounts
+          notificationStore.addNotification(
+            'critical',
+            `Critical limit exceeded! You've spent ${currencySymbol.value}${convertCurrency(monthlyExpenses).toFixed(2)} (over by ${currencySymbol.value}${convertCurrency(limitOverage.value).toFixed(2)})`
+          )
+          
           const modal = new window.bootstrap.Modal(document.getElementById('limitCriticalModal'))
           modal.show()
         }
@@ -752,6 +761,13 @@ export default {
           limitOverage.value = monthlyExpenses - warningLimit.value
           console.log('Warning limit reached! Over by:', limitOverage.value)
           warningShownThisSession.value = true
+          
+          // Create notification with converted amounts
+          notificationStore.addNotification(
+            'warning',
+            `Warning limit reached! You've spent ${currencySymbol.value}${convertCurrency(monthlyExpenses).toFixed(2)} (over by ${currencySymbol.value}${convertCurrency(limitOverage.value).toFixed(2)})`
+          )
+          
           const modal = new window.bootstrap.Modal(document.getElementById('limitWarningModal'))
           modal.show()
         }
