@@ -29,9 +29,10 @@
                     class="rounded-circle mb-2 border border-2 border-primary" 
                     width="120" height="120" 
                     alt="Profile Picture"
+                    style="object-fit: cover;"
                   />
-                  <div v-else class="rounded-circle bg-secondary d-flex align-items-center justify-content-center mb-2" style="width:120px;height:120px;">
-                    <i class="bi bi-person-fill text-white fs-2"></i>
+                  <div v-else class="rounded-circle d-flex align-items-center justify-content-center mb-2 border border-2 border-primary" style="width:120px;height:120px;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <span class="text-white fw-bold" style="font-size: 48px;">{{ userInitials }}</span>
                   </div>
                 </div>
 
@@ -52,8 +53,8 @@
                 <form @submit.prevent="updateProfile">
                   <div class="row g-3">
                     <div class="col-md-6">
-                      <label class="form-label">Full Name</label>
-                      <input type="text" v-model="profileForm.name" class="form-control" placeholder="John Doe" required />
+                      <label class="form-label">Username</label>
+                      <input type="text" v-model="profileForm.name" class="form-control" placeholder="username" required />
                     </div>
                     <div class="col-md-6">
                       <label class="form-label">Email Address</label>
@@ -214,7 +215,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useLoginStore } from '@/stores/loginStore'
 import { useRouter } from 'vue-router'
 
@@ -248,6 +249,13 @@ export default {
     const showCurrentPassword = ref(false)
     const showNewPassword = ref(false)
     const showConfirmPassword = ref(false)
+
+    const userInitials = computed(() => {
+      if (profileForm.value.name) {
+        return profileForm.value.name.slice(0, 2).toUpperCase()
+      }
+      return 'U'
+    })
 
     async function loadProfile() {
       try {
@@ -554,7 +562,7 @@ export default {
     return {
       successMessage, errorMessage, loadingProfile, loadingPassword, loadingLimit, loadingDelete, showDeleteModal,
       profileForm, passwordForm, limitForm, deleteForm, allLimits, limitsEnabled,
-      profileImageUrl, cacheBuster,
+      profileImageUrl, cacheBuster, userInitials,
       showCurrentPassword, showNewPassword, showConfirmPassword,
       onProfilePictureSelected, deleteProfilePicture,
       updateProfile, updatePassword, submitLimit, deleteAccount, updateLimitsToggle
