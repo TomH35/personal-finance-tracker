@@ -321,7 +321,10 @@ export default {
           successMessage.value = 'Profile picture uploaded!'
           profileImageUrl.value = BACKEND_URL + data.url
           cacheBuster.value = Date.now()
-          setTimeout(()=>successMessage.value='',3000)
+          // Trigger page reload to update navigation ProfileBubble
+          setTimeout(() => {
+            window.location.reload()
+          }, 500)
         }
       } catch(err) {
         errorMessage.value='Upload failed'
@@ -340,7 +343,10 @@ export default {
           profileImageUrl.value=''
           cacheBuster.value = Date.now()
           successMessage.value='Profile picture deleted'
-          setTimeout(()=>successMessage.value='',3000)
+          // Trigger page reload to update navigation ProfileBubble
+          setTimeout(() => {
+            window.location.reload()
+          }, 500)
         }
       } catch(err) {
         errorMessage.value='Failed to delete profile picture'

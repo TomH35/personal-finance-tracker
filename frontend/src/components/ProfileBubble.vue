@@ -235,8 +235,11 @@ const fetchProfilePicture = async () => {
       }
     })
     const data = await res.json()
-    if (data.success && data.profile_picture_url) {
-      profilePicture.value = BACKEND_URL + data.profile_picture_url
+    if (data.success && data.exists && data.url) {
+      // Add timestamp to prevent caching
+      profilePicture.value = BACKEND_URL + '/backend' + data.url + '?t=' + Date.now()
+    } else {
+      profilePicture.value = null
     }
   } catch (error) {
     console.error('Error fetching profile picture:', error)
