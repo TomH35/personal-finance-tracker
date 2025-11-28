@@ -102,3 +102,21 @@ CREATE TABLE rate_limits (
     require_captcha TINYINT(1) DEFAULT 0          -- Whether captcha is required for this attempt
 );
 
+-- ========================================
+--  TABLE: refresh_tokens
+-- ========================================
+-- Each record represents one refresh token for a user,
+-- used to generate new JWT access tokens without re-authentication.
+CREATE TABLE refresh_tokens (
+    token_id INT AUTO_INCREMENT PRIMARY KEY,          -- Token ID
+    user_id INT NOT NULL,                             -- Linked user
+    token VARCHAR(512) NOT NULL,                      -- Refresh token (JWT)
+    expires_at DATETIME NOT NULL,                     -- Token expiration timestamp
+    expired TINYINT(1) DEFAULT 0,                     -- Whether token has been manually expired (logout)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,    -- Creation time
+
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_token (token(255)),
+    INDEX idx_user_expired (user_id, expired)
+);
+

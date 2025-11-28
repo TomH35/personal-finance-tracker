@@ -115,6 +115,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLoginStore } from '../stores/loginStore'
 import { useNotificationStore } from '../stores/notificationStore'
+import { authenticatedFetch } from '@/utils/api'
 
 const router = useRouter()
 const loginStore = useLoginStore()
@@ -163,9 +164,9 @@ const closeDropdown = () => {
   isOpen.value = false
 }
 
-const handleLogout = () => {
+const handleLogout = async () => {
   const wasAdmin = isAdminUser.value
-  loginStore.clearJwt()
+  await loginStore.clearTokens()
   notificationStore.clearOnLogout()
   closeDropdown()
   if (wasAdmin) {
@@ -211,11 +212,7 @@ const clearAllNotifications = () => {
 
 const fetchUserProfile = async () => {
   try {
-    const res = await fetch('/backend/api/user-api/user-get-profile-api.php', {
-      headers: {
-        'Auth': `Bearer ${loginStore.jwt}`
-      }
-    })
+    const res = await authenticatedFetch('/backend/api/user-api/user-get-profile-api.php')
     const data = await res.json()
     if (data.success) {
       userProfile.value = data.user
@@ -227,11 +224,7 @@ const fetchUserProfile = async () => {
 
 const fetchProfilePicture = async () => {
   try {
-    const res = await fetch('/backend/api/user-api/user-get-profile-picture-api.php', {
-      headers: {
-        'Auth': `Bearer ${loginStore.jwt}`
-      }
-    })
+    const res = await authenticatedFetch('/backend/api/user-api/user-get-profile-picture-api.php')
     const data = await res.json()
     if (data.success && data.exists && data.url) {
       // Add timestamp to prevent caching

@@ -64,6 +64,9 @@ async function handleLoginClick(data) {
 
   if (resData.success) {
     loginStore.setJwt(resData.token)
+    if (resData.refresh_token) {
+      loginStore.setRefreshToken(resData.refresh_token)
+    }
     loginStore.setUserData(resData.user)
     router.push('/user-dashboard')
   } else {
@@ -115,6 +118,9 @@ async function sendLoginRequest(payload) {
 
   if (data.success) {
     loginStore.setJwt(data.token)
+    if (data.refresh_token) {
+      loginStore.setRefreshToken(data.refresh_token)
+    }
     router.push('/user-dashboard')
   } else {
     alertMessage.value = data.message
