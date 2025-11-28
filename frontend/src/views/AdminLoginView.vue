@@ -47,6 +47,9 @@ const handleLogin = async (loginData) => {
 
       if (data.token) {
         loginStore.setJwt(data.token) // Save token to store and localStorage
+        if (data.refresh_token) {
+          loginStore.setRefreshToken(data.refresh_token) // Save refresh token
+        }
         loginStore.setUserData(data.user)
       }
 

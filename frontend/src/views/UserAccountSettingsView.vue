@@ -218,6 +218,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useLoginStore } from '@/stores/loginStore'
 import { useRouter } from 'vue-router'
+import { authenticatedFetch } from '@/utils/api'
 
 export default {
   name: 'AccountSettingsView',
@@ -244,7 +245,6 @@ export default {
     // Profile picture
     const profileImageUrl = ref('')
     const cacheBuster = ref(Date.now())
-    const BACKEND_URL = 'http://localhost/personal-finance-tracker/backend'
 
     const showCurrentPassword = ref(false)
     const showNewPassword = ref(false)
@@ -259,9 +259,7 @@ export default {
 
     async function loadProfile() {
       try {
-        const res = await fetch('/backend/api/user-api/user-get-profile-api.php', {
-          headers: { 'Auth': `Bearer ${loginStore.jwt}` }
-        })
+        const res = await authenticatedFetch('/backend/api/user-api/user-get-profile-api.php')
         const data = await res.json()
         if (data.success && data.user) {
           profileForm.value.name = data.user.username
@@ -282,12 +280,10 @@ export default {
 
     async function loadProfilePicture() {
       try {
-        const res = await fetch(BACKEND_URL + '/api/user-api/user-get-profile-picture-api.php', {
-          headers: { 'Auth': `Bearer ${loginStore.jwt}` }
-        })
+        const res = await authenticatedFetch('/backend/api/user-api/user-get-profile-picture-api.php')
         const data = await res.json()
-        if (data.success && data.exists) {
-          profileImageUrl.value = BACKEND_URL + data.url
+        if (data.success && data.exists && data.url) {
+          profileImageUrl.value = '/backend' + data.url + '?t=' + Date.now()
           cacheBuster.value = Date.now()
         } else {
           profileImageUrl.value = ''
@@ -308,9 +304,8 @@ export default {
       formData.append('profile_picture', file)
 
       try {
-        const res = await fetch(BACKEND_URL + '/api/user-api/user-upload-profile-picture-api.php', {
+        const res = await authenticatedFetch('/backend/api/user-api/user-upload-profile-picture-api.php', {
           method: 'POST',
-          headers: { 'Auth': `Bearer ${loginStore.jwt}` },
           body: formData
         })
         const data = await res.json()
@@ -319,7 +314,7 @@ export default {
           setTimeout(()=>errorMessage.value='',3000)
         } else {
           successMessage.value = 'Profile picture uploaded!'
-          profileImageUrl.value = BACKEND_URL + data.url
+          profileImageUrl.value = '/backend' + data.url + '?t=' + Date.now()
           cacheBuster.value = Date.now()
           // Trigger page reload to update navigation ProfileBubble
           setTimeout(() => {
@@ -334,9 +329,8 @@ export default {
 
     async function deleteProfilePicture() {
       try {
-        const res = await fetch(BACKEND_URL + '/api/user-api/user-delete-profile-picture-api.php', {
-          method:'POST',
-          headers:{ 'Auth':`Bearer ${loginStore.jwt}` }
+        const res = await authenticatedFetch('/backend/api/user-api/user-delete-profile-picture-api.php', {
+          method:'POST'
         })
         const data = await res.json()
         if(data.success) {
@@ -356,9 +350,7 @@ export default {
 
     async function loadLimits() {
       try {
-        const res = await fetch(`/backend/api/limit-api/get-limit-api.php`, {
-          headers: { 'auth': `Bearer ${loginStore.jwt}` }
-        })
+        const res = await authenticatedFetch(`/backend/api/limit-api/get-limit-api.php`)
         const data = await res.json()
         if (data.success && data.limit && data.limit.length > 0) {
           allLimits.value = Array.isArray(data.limit) ? data.limit : [data.limit]
@@ -386,9 +378,8 @@ export default {
       userToggled.value = true
       try {
         if (limitForm.value.limit_id) {
-          const res = await fetch(`/backend/api/limit-api/toggle-limit-api.php`, {
+          const res = await authenticatedFetch(`/backend/api/limit-api/toggle-limit-api.php`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
             body: JSON.stringify({ 
               limit_id: limitForm.value.limit_id,
               enabled: limitsEnabled.value ? 1 : 0 
@@ -416,9 +407,8 @@ export default {
           ? `/backend/api/limit-api/edit-limit-api.php`
           : `/backend/api/limit-api/set-limit-api.php`
 
-        const res = await fetch(url, {
+        const res = await authenticatedFetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${loginStore.jwt}` },
           body: JSON.stringify({
             ...limitForm.value,
             enabled: 1
@@ -445,12 +435,8 @@ export default {
       errorMessage.value = ''
       successMessage.value = ''
       try {
-        const res = await fetch('/backend/api/user-api/user-update-profile-api.php', {
+        const res = await authenticatedFetch('/backend/api/user-api/user-update-profile-api.php', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({
             username: profileForm.value.name,
             email: profileForm.value.email,
@@ -491,12 +477,8 @@ export default {
       successMessage.value = ''
 
       try {
-        const res = await fetch('/backend/api/user-api/user-change-password-api.php', {
+        const res = await authenticatedFetch('/backend/api/user-api/user-change-password-api.php', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({
             currentPassword: passwordForm.value.currentPassword,
             newPassword: passwordForm.value.newPassword,
@@ -529,19 +511,15 @@ export default {
       errorMessage.value = ''
       successMessage.value = ''
       try{
-        const res = await fetch('/backend/api/user-api/user-delete-own-account-api.php', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json', 
-            'Auth': `Bearer ${loginStore.jwt}` 
-          }
+        const res = await authenticatedFetch('/backend/api/user-api/user-delete-own-account-api.php', {
+          method: 'POST'
         })
         const data = await res.json()
         
         if (data.success) {
           successMessage.value = 'Account deleted successfully. Redirecting...'
-          setTimeout(() => {
-            loginStore.clearJwt()
+          setTimeout(async () => {
+            await loginStore.clearTokens()
             router.push('/')
           }, 1500)
         } else {

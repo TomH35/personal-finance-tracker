@@ -1,9 +1,9 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { useLoginStore } from '@/stores/loginStore'
+import { authenticatedFetch } from '@/utils/api'
 
 const loginStore = useLoginStore()
-const jwt = loginStore.jwt
 
 // Users
 const users = ref([])
@@ -37,10 +37,7 @@ const showAlert = (message, duration = 3000) => {
 // Fetch users and categories
 onMounted(async () => {
   try {
-    const response = await fetch('/backend/api/user-api/user-get-all-api.php', {
-      method: 'GET',
-      headers: { 'auth': `Bearer ${jwt}` }
-    })
+    const response = await authenticatedFetch('/backend/api/user-api/user-get-all-api.php')
     const data = await response.json()
     if (data.success) users.value = data.users
     else userError.value = data.message
@@ -66,12 +63,8 @@ const createUser = async () => {
       ? '/backend/api/auth-api/admin-registration-api.php'
       : '/backend/api/auth-api/user-registration-api.php'
 
-    const res = await fetch(apiUrl, {
+    const res = await authenticatedFetch(apiUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'auth': `Bearer ${jwt}`
-      },
       body: JSON.stringify(newUser.value)
     })
 
@@ -100,12 +93,8 @@ const openEditUserModal = async (user) => {
 // UPDATE USER
 const updateUser = async () => {
   try {
-    const res = await fetch('/backend/api/user-api/user-edit-api.php', {
+    const res = await authenticatedFetch('/backend/api/user-api/user-edit-api.php', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'auth': `Bearer ${jwt}`
-      },
       body: JSON.stringify(editUserData.value)
     })
 
@@ -128,12 +117,8 @@ const deleteUser = async (user_id) => {
   if (!confirm('Are you sure you want to delete this user?')) return
 
   try {
-    const res = await fetch('/backend/api/user-api/user-delete-api.php', {
+    const res = await authenticatedFetch('/backend/api/user-api/user-delete-api.php', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'auth': `Bearer ${jwt}`
-      },
       body: JSON.stringify({ user_id })
     })
 
@@ -151,10 +136,7 @@ const deleteUser = async (user_id) => {
 // Category actions
 const getCategories = async () => {
   try {
-    const res = await fetch('/backend/api/category-api/category-get-all-api.php', {
-      method: 'GET',
-      headers: { 'auth': `Bearer ${jwt}` }
-    })
+    const res = await authenticatedFetch('/backend/api/category-api/category-get-all-api.php')
     const data = await res.json()
     if (data.success) categories.value = data.categories
     else categoryError.value = data.message
@@ -174,9 +156,8 @@ const addCategory = async () => {
   }
 
   try {
-    const res = await fetch('/backend/api/category-api/category-create-api.php', {
+    const res = await authenticatedFetch('/backend/api/category-api/category-create-api.php', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
       body: JSON.stringify({ name: newCategory.value.trim(), type: newCategoryType.value })
     })
     const data = await res.json()
@@ -209,9 +190,8 @@ const updateCategory = async () => {
   }
 
   try {
-    const res = await fetch('/backend/api/category-api/category-edit-api.php', {
+    const res = await authenticatedFetch('/backend/api/category-api/category-edit-api.php', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
       body: JSON.stringify(selectedCategory.value)
     })
     const data = await res.json()
@@ -232,9 +212,8 @@ const updateCategory = async () => {
 const deleteCategory = async (id) => {
   if (!confirm('Are you sure you want to delete this category?')) return
   try {
-    const res = await fetch('/backend/api/category-api/category-delete-api.php', {
+    const res = await authenticatedFetch('/backend/api/category-api/category-delete-api.php', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'auth': `Bearer ${jwt}` },
       body: JSON.stringify({ id })
     })
     const data = await res.json()

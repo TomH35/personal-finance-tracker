@@ -1,23 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { authenticatedFetch } from '@/utils/api'
 
 export const useNotificationStore = defineStore('notificationStore', () => {
   const notifications = ref([])
 
-  // Get JWT token dynamically
-  function getJwt() {
-    const jwt = localStorage.getItem('jwt')
-    return jwt || ''
-  }
-
   // Load notifications from API
   async function loadNotifications() {
     try {
-      const res = await fetch('/backend/api/notification-api/notification-get-all-api.php', {
-        headers: {
-          'Auth': `Bearer ${getJwt()}`
-        }
-      })
+      const res = await authenticatedFetch('/backend/api/notification-api/notification-get-all-api.php')
       const data = await res.json()
       
       if (data.success) {
@@ -38,12 +29,8 @@ export const useNotificationStore = defineStore('notificationStore', () => {
   // Add a new notification (create in API)
   async function addNotification(type, message, limit_id = null) {
     try {
-      const res = await fetch('/backend/api/notification-api/notification-create-api.php', {
+      const res = await authenticatedFetch('/backend/api/notification-api/notification-create-api.php', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Auth': `Bearer ${getJwt()}`
-        },
         body: JSON.stringify({
           type,
           message,
@@ -68,12 +55,8 @@ export const useNotificationStore = defineStore('notificationStore', () => {
   // Remove a notification by ID (delete from API)
   async function removeNotification(id) {
     try {
-      const res = await fetch('/backend/api/notification-api/notification-delete-api.php', {
+      const res = await authenticatedFetch('/backend/api/notification-api/notification-delete-api.php', {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Auth': `Bearer ${getJwt()}`
-        },
         body: JSON.stringify({
           notification_id: id
         })
@@ -93,12 +76,8 @@ export const useNotificationStore = defineStore('notificationStore', () => {
   // Mark notification as read (update in API)
   async function markAsRead(id) {
     try {
-      const res = await fetch('/backend/api/notification-api/notification-mark-read-api.php', {
+      const res = await authenticatedFetch('/backend/api/notification-api/notification-mark-read-api.php', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Auth': `Bearer ${getJwt()}`
-        },
         body: JSON.stringify({
           notification_id: id
         })
@@ -121,12 +100,8 @@ export const useNotificationStore = defineStore('notificationStore', () => {
   // Mark all as read (update in API)
   async function markAllAsRead() {
     try {
-      const res = await fetch('/backend/api/notification-api/notification-mark-all-read-api.php', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Auth': `Bearer ${getJwt()}`
-        }
+      const res = await authenticatedFetch('/backend/api/notification-api/notification-mark-all-read-api.php', {
+        method: 'PUT'
       })
       
       const data = await res.json()
@@ -143,12 +118,8 @@ export const useNotificationStore = defineStore('notificationStore', () => {
   // Clear all notifications (delete from API)
   async function clearAll() {
     try {
-      const res = await fetch('/backend/api/notification-api/notification-delete-all-api.php', {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Auth': `Bearer ${getJwt()}`
-        }
+      const res = await authenticatedFetch('/backend/api/notification-api/notification-delete-all-api.php', {
+        method: 'DELETE'
       })
       
       const data = await res.json()

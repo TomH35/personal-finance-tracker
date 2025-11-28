@@ -453,6 +453,7 @@ import { useLoginStore } from '@/stores/loginStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { authenticatedFetch } from '@/utils/api'
 
 export default {
   name: 'UserDashboardView',
@@ -627,13 +628,7 @@ export default {
       loading.value = true
       try {
         
-        const response = await fetch('/backend/api/transaction-api/transaction-get-all-api.php', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          }
-        })
+        const response = await authenticatedFetch('/backend/api/transaction-api/transaction-get-all-api.php')
         const data = await response.json()
         
         if (data.success) {
@@ -660,13 +655,7 @@ export default {
     async function loadTransactions() {
       loading.value = true
       try {
-        const response = await fetch('/backend/api/transaction-api/transaction-get-all-api.php', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          }
-        })
+        const response = await authenticatedFetch('/backend/api/transaction-api/transaction-get-all-api.php')
         const data = await response.json()
         if (data.success) {
           incomeList.value = data.income || []
@@ -680,13 +669,7 @@ export default {
 
     async function loadCategories() {
       try {
-        const response = await fetch('/backend/api/category-api/category-get-all-api.php', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          }
-        })
+        const response = await authenticatedFetch('/backend/api/category-api/category-get-all-api.php')
         const data = await response.json()
         if (data.success) {
           categories.value = data.categories || []
@@ -698,13 +681,7 @@ export default {
 
     async function loadLimits() {
       try {
-        const response = await fetch('/backend/api/limit-api/get-limit-api.php', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          }
-        })
+        const response = await authenticatedFetch('/backend/api/limit-api/get-limit-api.php')
         const data = await response.json()
         if (data.success && data.limit && data.limit.length > 0) {
           // Backend returns an array, get the first (most recent) limit
@@ -782,12 +759,8 @@ export default {
     async function addTransaction() {
       loading.value = true
       try {
-        const response = await fetch('/backend/api/transaction-api/transaction-create-api.php', {
+        const response = await authenticatedFetch('/backend/api/transaction-api/transaction-create-api.php', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({
             type: formData.value.type,
             amount: formData.value.amount,
@@ -833,12 +806,8 @@ export default {
 
       loading.value = true
       try {
-        const response = await fetch('/backend/api/transaction-api/transaction-delete-api.php', {
+        const response = await authenticatedFetch('/backend/api/transaction-api/transaction-delete-api.php', {
           method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({ id, type })
         })
         const data = await response.json()
@@ -879,12 +848,8 @@ export default {
 
       loading.value = true
       try {
-        const response = await fetch('/backend/api/transaction-api/transaction-delete-api.php', {
+        const response = await authenticatedFetch('/backend/api/transaction-api/transaction-delete-api.php', {
           method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({ id })
         })
         const data = await response.json()
@@ -922,12 +887,8 @@ export default {
     async function updateTransaction() {
       loading.value = true
       try {
-        const response = await fetch('/backend/api/transaction-api/transaction-edit-api.php', {
+        const response = await authenticatedFetch('/backend/api/transaction-api/transaction-edit-api.php', {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({
             id: editingId.value,
             type: editFormData.value.type,
@@ -972,12 +933,8 @@ export default {
 
       loading.value = true
       try {
-        const response = await fetch('/backend/api/custom-categories-api/custom-category-create-api.php', {
+        const response = await authenticatedFetch('/backend/api/custom-categories-api/custom-category-create-api.php', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({ name, type })
         })
         const data = await response.json()
@@ -1026,12 +983,8 @@ export default {
     async function updateCategory() {
       loading.value = true
       try {
-        const response = await fetch('/backend/api/custom-categories-api/custom-category-edit-api.php', {
+        const response = await authenticatedFetch('/backend/api/custom-categories-api/custom-category-edit-api.php', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({
             id: editCategoryData.value.id,
             name: editCategoryData.value.name,
@@ -1071,12 +1024,8 @@ export default {
     async function confirmDeleteCategory() {
       loading.value = true
       try {
-        const response = await fetch('/backend/api/custom-categories-api/custom-category-delete-api.php', {
+        const response = await authenticatedFetch('/backend/api/custom-categories-api/custom-category-delete-api.php', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Auth': `Bearer ${loginStore.jwt}`
-          },
           body: JSON.stringify({ id: editCategoryData.value.id })
         })
         const data = await response.json()
@@ -1102,9 +1051,7 @@ export default {
     // Load user profile to get currency
     async function loadUserProfile() {
       try {
-        const res = await fetch('/backend/api/user-api/user-get-profile-api.php', {
-          headers: { 'Auth': `Bearer ${loginStore.jwt}` }
-        })
+        const res = await authenticatedFetch('/backend/api/user-api/user-get-profile-api.php')
         const data = await res.json()
         if (data.success && data.user) {
           userCurrency.value = data.user.currency || 'USD'

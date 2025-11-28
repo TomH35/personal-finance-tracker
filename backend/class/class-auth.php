@@ -12,6 +12,7 @@ use Firebase\JWT\BeforeValidException;
 class Auth {
     private $db;
     private $jwtSecret;
+    private $refreshTokenSecret;
 
     public function __construct() {
         $this->db = new Db();
@@ -20,6 +21,7 @@ class Auth {
         $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
         $dotenv->load();
         $this->jwtSecret = $_ENV['JWT_SECRET'];
+        $this->refreshTokenSecret = $_ENV['REFRESH_TOKEN_SECRET'];
     }
 
     /**
@@ -188,10 +190,31 @@ class Auth {
             // Generate JWT token
             $jwt = JWT::encode($payload, $this->jwtSecret, 'HS256');
 
+            // Generate refresh token
+            $refreshTokenResult = $this->generateRefreshToken($user['user_id']);
+            
+            if (!$refreshTokenResult['success']) {
+                error_log("Failed to generate refresh token: " . ($refreshTokenResult['message'] ?? 'Unknown error'));
+                // Still return success but without refresh token
+                return [
+                    'success' => true,
+                    'message' => 'Login successful',
+                    'token' => $jwt,
+                    'user' => [
+                        'user_id' => $user['user_id'],
+                        'username' => $user['username'],
+                        'email' => $user['email'],
+                        'role' => $user['role']
+                    ]
+                ];
+            }
+
             return [
                 'success' => true,
                 'message' => 'Login successful',
                 'token' => $jwt,
+                'refresh_token' => $refreshTokenResult['token'],
+                'refresh_token_expires_at' => $refreshTokenResult['expires_at'],
                 'user' => [
                     'user_id' => $user['user_id'],
                     'username' => $user['username'],
@@ -225,22 +248,11 @@ class Auth {
         try {
             $decoded = JWT::decode($jwt, new Key($this->jwtSecret, 'HS256'));
 
-            if (!isset($decoded->data->user_id)) {
+            if (!isset($decoded->data->role)) {
                 return false;
             }
 
-            $userId = $decoded->data->user_id;
-
-            $pdo = $this->db->getPdo();
-            $stmt = $pdo->prepare("SELECT role FROM users WHERE user_id = :user_id LIMIT 1");
-            $stmt->execute(['user_id' => $userId]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($user && $user['role'] === 'admin') {
-                return true;
-            }
-
-            return false;
+            return $decoded->data->role === 'admin';
 
         } catch (ExpiredException $e) {
             error_log("JWT expired: " . $e->getMessage());
@@ -253,9 +265,6 @@ class Auth {
             return false;
         } catch (Exception $e) {
             error_log("JWT verification error: " . $e->getMessage());
-            return false;
-        } catch (PDOException $e) {
-            error_log("Database error in isAdmin: " . $e->getMessage());
             return false;
         }
     }
@@ -270,22 +279,12 @@ class Auth {
         try {
             $decoded = JWT::decode($jwt, new Key($this->jwtSecret, 'HS256'));
 
-            if (!isset($decoded->data->user_id)) {
+            if (!isset($decoded->data->role)) {
                 return false;
             }
 
-            $userId = $decoded->data->user_id;
-
-            $pdo = $this->db->getPdo();
-            $stmt = $pdo->prepare("SELECT role FROM users WHERE user_id = :user_id LIMIT 1");
-            $stmt->execute(['user_id' => $userId]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($user && ($user['role'] === 'user' || $user['role'] === 'admin')) {
-                return true;
-            }
-
-            return false;
+            $role = $decoded->data->role;
+            return $role === 'user' || $role === 'admin';
 
         } catch (ExpiredException $e) {
             error_log("JWT expired: " . $e->getMessage());
@@ -299,9 +298,327 @@ class Auth {
         } catch (Exception $e) {
             error_log("JWT verification error: " . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Generate a refresh token for a user
+     * 
+     * @param int $userId The user ID
+     * @return array Response array with success status, token, and expiration
+     */
+    public function generateRefreshToken($userId) {
+        try {
+            $pdo = $this->db->getPdo();
+
+            // Get user data
+            $stmt = $pdo->prepare("SELECT user_id, email, username, role FROM users WHERE user_id = :user_id LIMIT 1");
+            $stmt->execute(['user_id' => $userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found'
+                ];
+            }
+
+            // Prepare refresh token payload (valid for 7 days)
+            $issuedAt = time();
+            $expirationTime = $issuedAt + (60 * 60 * 24 * 7); // 7 days
+            $expiresAt = date('Y-m-d H:i:s', $expirationTime);
+
+            $payload = [
+                'iat' => $issuedAt,
+                'exp' => $expirationTime,
+                'iss' => 'PFT',
+                'type' => 'refresh',
+                'data' => [
+                    'user_id' => $user['user_id'],
+                    'email' => $user['email'],
+                    'username' => $user['username'],
+                    'role' => $user['role']
+                ]
+            ];
+
+            // Generate refresh token
+            $refreshToken = JWT::encode($payload, $this->refreshTokenSecret, 'HS256');
+
+            // Store in database
+            $stmt = $pdo->prepare("
+                INSERT INTO refresh_tokens (user_id, token, expires_at) 
+                VALUES (:user_id, :token, :expires_at)
+            ");
+            $stmt->execute([
+                'user_id' => $userId,
+                'token' => $refreshToken,
+                'expires_at' => $expiresAt
+            ]);
+
+            return [
+                'success' => true,
+                'token' => $refreshToken,
+                'expires_at' => $expiresAt
+            ];
+
         } catch (PDOException $e) {
-            error_log("Database error in isUser: " . $e->getMessage());
+            error_log("Refresh token generation error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Failed to generate refresh token'
+            ];
+        } catch (Exception $e) {
+            error_log("JWT error in refresh token: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Token generation failed'
+            ];
+        }
+    }
+
+    /**
+     * Validate a refresh token and return user data
+     * 
+     * @param string $refreshToken The refresh token to validate
+     * @return array Response array with success status and user data or error message
+     */
+    public function validateRefreshToken($refreshToken) {
+        try {
+            // Decode and verify the token
+            $decoded = JWT::decode($refreshToken, new Key($this->refreshTokenSecret, 'HS256'));
+
+            // Check if it's a refresh token
+            if (!isset($decoded->type) || $decoded->type !== 'refresh') {
+                return [
+                    'success' => false,
+                    'message' => 'Invalid token type'
+                ];
+            }
+
+            if (!isset($decoded->data->user_id)) {
+                return [
+                    'success' => false,
+                    'message' => 'Invalid token payload'
+                ];
+            }
+
+            $userId = $decoded->data->user_id;
+            $pdo = $this->db->getPdo();
+
+            // Check if token exists in database and is not expired/revoked
+            $stmt = $pdo->prepare("
+                SELECT token_id, user_id, expires_at, expired 
+                FROM refresh_tokens 
+                WHERE token = :token AND user_id = :user_id 
+                LIMIT 1
+            ");
+            $stmt->execute([
+                'token' => $refreshToken,
+                'user_id' => $userId
+            ]);
+            $tokenRecord = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$tokenRecord) {
+                return [
+                    'success' => false,
+                    'message' => 'Token not found'
+                ];
+            }
+
+            // Check if token is marked as expired (logged out)
+            if ($tokenRecord['expired'] == 1) {
+                return [
+                    'success' => false,
+                    'message' => 'Token has been revoked'
+                ];
+            }
+
+            // Check if token is past expiration date
+            if (strtotime($tokenRecord['expires_at']) < time()) {
+                // Mark as expired and delete
+                $this->deleteRefreshToken($refreshToken);
+                return [
+                    'success' => false,
+                    'message' => 'Token has expired'
+                ];
+            }
+
+            // Get current user data
+            $stmt = $pdo->prepare("SELECT user_id, email, username, role FROM users WHERE user_id = :user_id LIMIT 1");
+            $stmt->execute(['user_id' => $userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                return [
+                    'success' => false,
+                    'message' => 'User not found'
+                ];
+            }
+
+            return [
+                'success' => true,
+                'user' => $user,
+                'token_id' => $tokenRecord['token_id']
+            ];
+
+        } catch (ExpiredException $e) {
+            error_log("Refresh token expired: " . $e->getMessage());
+            // Clean up the expired token from database
+            $this->deleteRefreshToken($refreshToken);
+            return [
+                'success' => false,
+                'message' => 'Refresh token has expired'
+            ];
+        } catch (SignatureInvalidException $e) {
+            error_log("Refresh token signature invalid: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Invalid refresh token'
+            ];
+        } catch (BeforeValidException $e) {
+            error_log("Refresh token not yet valid: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Token not yet valid'
+            ];
+        } catch (Exception $e) {
+            error_log("Refresh token validation error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Token validation failed'
+            ];
+        }
+    }
+
+    /**
+     * Revoke a refresh token (mark as expired)
+     * 
+     * @param string $refreshToken The refresh token to revoke
+     * @return array Response array with success status
+     */
+    public function revokeRefreshToken($refreshToken) {
+        try {
+            $pdo = $this->db->getPdo();
+
+            // Mark token as expired
+            $stmt = $pdo->prepare("UPDATE refresh_tokens SET expired = 1 WHERE token = :token");
+            $stmt->execute(['token' => $refreshToken]);
+
+            // Delete the token (as per user's requirement: delete when expired/logged out)
+            $this->deleteRefreshToken($refreshToken);
+
+            return [
+                'success' => true,
+                'message' => 'Token revoked successfully'
+            ];
+
+        } catch (PDOException $e) {
+            error_log("Token revocation error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Failed to revoke token'
+            ];
+        }
+    }
+
+    /**
+     * Delete a refresh token from database
+     * 
+     * @param string $refreshToken The refresh token to delete
+     * @return bool True on success, false on failure
+     */
+    private function deleteRefreshToken($refreshToken) {
+        try {
+            $pdo = $this->db->getPdo();
+            $stmt = $pdo->prepare("DELETE FROM refresh_tokens WHERE token = :token");
+            $stmt->execute(['token' => $refreshToken]);
+            return true;
+        } catch (PDOException $e) {
+            error_log("Token deletion error: " . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Revoke all refresh tokens for a user (e.g., when changing password)
+     * 
+     * @param int $userId The user ID
+     * @return array Response array with success status
+     */
+    public function revokeAllUserRefreshTokens($userId) {
+        try {
+            $pdo = $this->db->getPdo();
+
+            // Delete all tokens for this user
+            $stmt = $pdo->prepare("DELETE FROM refresh_tokens WHERE user_id = :user_id");
+            $stmt->execute(['user_id' => $userId]);
+
+            return [
+                'success' => true,
+                'message' => 'All tokens revoked successfully'
+            ];
+
+        } catch (PDOException $e) {
+            error_log("Token revocation error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Failed to revoke tokens'
+            ];
+        }
+    }
+
+    /**
+     * Refresh access token using a valid refresh token
+     * 
+     * @param string $refreshToken The refresh token
+     * @return array Response array with new access token or error
+     */
+    public function refreshAccessToken($refreshToken) {
+        // Validate the refresh token
+        $validation = $this->validateRefreshToken($refreshToken);
+        
+        if (!$validation['success']) {
+            return $validation;
+        }
+
+        $user = $validation['user'];
+
+        // Generate new access token
+        $issuedAt = time();
+        $expirationTime = $issuedAt + (60 * 60); // 1 hour
+
+        $payload = [
+            'iat' => $issuedAt,
+            'exp' => $expirationTime,
+            'iss' => 'PFT',
+            'data' => [
+                'user_id' => $user['user_id'],
+                'email' => $user['email'],
+                'username' => $user['username'],
+                'role' => $user['role']
+            ]
+        ];
+
+        try {
+            $jwt = JWT::encode($payload, $this->jwtSecret, 'HS256');
+
+            return [
+                'success' => true,
+                'message' => 'Token refreshed successfully',
+                'token' => $jwt,
+                'user' => [
+                    'user_id' => $user['user_id'],
+                    'username' => $user['username'],
+                    'email' => $user['email'],
+                    'role' => $user['role']
+                ]
+            ];
+        } catch (Exception $e) {
+            error_log("JWT generation error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Failed to generate new access token'
+            ];
         }
     }
 
