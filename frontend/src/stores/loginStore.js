@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import router from '@/router'
 
 export const useLoginStore = defineStore('loginStore', () => {
   // State
@@ -117,6 +118,7 @@ export const useLoginStore = defineStore('loginStore', () => {
           localStorage.removeItem('refreshToken')
           userData.value = null
           localStorage.removeItem('userData')
+          router.push('/login')
           return { success: false, message: result.message || 'Token refresh failed' }
         }
       } catch (error) {
