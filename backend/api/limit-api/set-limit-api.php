@@ -22,6 +22,7 @@ $user_id = $auth->getUserId($jwt);
 $warning = $data['warning_limit'] ?? 0;
 $critical = $data['critical_limit'] ?? 0;
 $enabled = isset($data['enabled']) ? (int)$data['enabled'] : 1;
+$currency = $data['currency'] ?? 'USD';
 
-echo json_encode($limits->setLimit($user_id, $warning, $critical, $enabled));
+echo json_encode($limits->setLimit($user_id, $warning, $critical, $enabled, $currency));
 ?>

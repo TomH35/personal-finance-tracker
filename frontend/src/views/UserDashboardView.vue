@@ -759,11 +759,14 @@ export default {
     async function addTransaction() {
       loading.value = true
       try {
+      	const rate = exchangeRates[userCurrency.value] || 1.0
+    	const amountInUSD = parseFloat(formData.value.amount) / rate
+    	
         const response = await authenticatedFetch('/backend/api/transaction-api/transaction-create-api.php', {
           method: 'POST',
           body: JSON.stringify({
             type: formData.value.type,
-            amount: formData.value.amount,
+            amount: amountInUSD,
             category_id: formData.value.category_id,
             note: formData.value.note || null,
             date: formData.value.date
@@ -831,9 +834,11 @@ export default {
 
     function editTransaction(transaction) {
       editingId.value = transaction.id
+      const rate = exchangeRates[userCurrency.value] || 1.0
+      
       editFormData.value = {
         type: transaction.type,
-        amount: transaction.amount,
+        amount: parseFloat(transaction.amount * rate).toFixed(2),
         category_id: transaction.category_id,
         note: transaction.note || '',
         date: transaction.date
@@ -872,9 +877,11 @@ export default {
 
     function editTransactionItem(transaction) {
       editingId.value = transaction.id
+      const rate = exchangeRates[userCurrency.value] || 1.0
+      
       editFormData.value = {
         type: transaction.type || 'income',
-        amount: transaction.amount,
+        amount: parseFloat(transaction.amount * rate).toFixed(2),
         category_id: transaction.category_id,
         note: transaction.note || '',
         date: transaction.date
@@ -887,12 +894,15 @@ export default {
     async function updateTransaction() {
       loading.value = true
       try {
+      const rate = exchangeRates[userCurrency.value] || 1.0
+	const amountInUSD = parseFloat(editFormData.value.amount) / rate
+	
         const response = await authenticatedFetch('/backend/api/transaction-api/transaction-edit-api.php', {
           method: 'PUT',
           body: JSON.stringify({
             id: editingId.value,
             type: editFormData.value.type,
-            amount: editFormData.value.amount,
+            amount: amountInUSD,
             category_id: editFormData.value.category_id,
             note: editFormData.value.note || null,
             date: editFormData.value.date
