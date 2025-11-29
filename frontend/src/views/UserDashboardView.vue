@@ -834,9 +834,11 @@ export default {
 
     function editTransaction(transaction) {
       editingId.value = transaction.id
+      const rate = exchangeRates[userCurrency.value] || 1.0
+      
       editFormData.value = {
         type: transaction.type,
-        amount: transaction.amount,
+        amount: parseFloat(transaction.amount * rate).toFixed(2),
         category_id: transaction.category_id,
         note: transaction.note || '',
         date: transaction.date
@@ -875,9 +877,11 @@ export default {
 
     function editTransactionItem(transaction) {
       editingId.value = transaction.id
+      const rate = exchangeRates[userCurrency.value] || 1.0
+      
       editFormData.value = {
         type: transaction.type || 'income',
-        amount: transaction.amount,
+        amount: parseFloat(transaction.amount * rate).toFixed(2),
         category_id: transaction.category_id,
         note: transaction.note || '',
         date: transaction.date

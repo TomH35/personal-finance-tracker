@@ -257,6 +257,13 @@ export default {
       return 'U'
     })
 
+    const exchangeRates = {
+      'USD': 1.0,
+      'EUR': 0.92,
+      'PLN': 4.05,
+      'CZK': 23.15
+    }
+
     async function loadProfile() {
       try {
         const res = await authenticatedFetch('/backend/api/user-api/user-get-profile-api.php')
@@ -317,9 +324,7 @@ export default {
           profileImageUrl.value = '/backend' + data.url + '?t=' + Date.now()
           cacheBuster.value = Date.now()
           // Trigger page reload to update navigation ProfileBubble
-          setTimeout(() => {
-            window.location.reload()
-          }, 500)
+          setTimeout(() => { window.location.reload() }, 500)
         }
       } catch(err) {
         errorMessage.value='Upload failed'
@@ -338,9 +343,7 @@ export default {
           cacheBuster.value = Date.now()
           successMessage.value='Profile picture deleted'
           // Trigger page reload to update navigation ProfileBubble
-          setTimeout(() => {
-            window.location.reload()
-          }, 500)
+          setTimeout(() => { window.location.reload() }, 500)
         }
       } catch(err) {
         errorMessage.value='Failed to delete profile picture'
@@ -359,8 +362,9 @@ export default {
             limitForm.value.limit_id = userLimit.limit_id
             if (userLimit.enabled) {
               limitsEnabled.value = true
-              limitForm.value.warning_limit = userLimit.warning_limit
-              limitForm.value.critical_limit = userLimit.critical_limit
+              const rate = exchangeRates[profileForm.value.currency] || 1.0
+              limitForm.value.warning_limit = (userLimit.warning_limit * rate).toFixed(2)
+              limitForm.value.critical_limit = (userLimit.critical_limit * rate).toFixed(2)
             } else {
               limitsEnabled.value = false
               limitForm.value.warning_limit = ''
@@ -407,11 +411,18 @@ export default {
           ? `/backend/api/limit-api/edit-limit-api.php`
           : `/backend/api/limit-api/set-limit-api.php`
 
+        const rate = exchangeRates[profileForm.value.currency] || 1.0
+        const warningUSD = parseFloat(limitForm.value.warning_limit) / rate
+        const criticalUSD = parseFloat(limitForm.value.critical_limit) / rate
+
         const res = await authenticatedFetch(url, {
           method: 'POST',
           body: JSON.stringify({
-            ...limitForm.value,
-            enabled: 1
+            limit_id: limitForm.value.limit_id,
+            warning_limit: warningUSD,
+            critical_limit: criticalUSD,
+            enabled: 1,
+            currency: 'USD'
           })
         })
         const data = await res.json()
