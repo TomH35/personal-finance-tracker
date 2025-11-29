@@ -8,8 +8,23 @@ class Transactions {
         $this->db = new Db();
     }
 
+    private function convertToUSD($amount, $userCurrency) {
+        $exchangeRates = [
+            'USD' => 1.0,
+            'EUR' => 0.92,
+            'PLN' => 4.05,
+            'CZK' => 23.15
+        ];
+
+        if (!isset($exchangeRates[$userCurrency])) {
+            throw new Exception('Unsupported currency: ' . $userCurrency);
+        }
+
+        return round($amount / $exchangeRates[$userCurrency], 2);
+    }
+
     // Create a new income or expense
-    public function createTransaction($user_id, $amount, $category_id, $note = null, $date = null, $type = 'income') {
+    public function createTransaction($user_id, $amount, $category_id, $note = null, $date = null, $type = 'income', $userCurrency = 'USD') {
         try {
             $pdo = $this->db->getPdo();
 
@@ -44,13 +59,15 @@ class Transactions {
                 $date = date('Y-m-d');
             }
 
+            $amountUSD = $this->convertToUSD($amount, $userCurrency);
+
             $stmt = $pdo->prepare("
                 INSERT INTO transactions (user_id, amount, category_id, note, date, type)
                 VALUES (:user_id, :amount, :category_id, :note, :date, :type)
             ");
             $stmt->execute([
                 'user_id' => $user_id,
-                'amount' => $amount,
+                'amount' => $amountUSD,
                 'category_id' => $category_id,
                 'note' => $note,
                 'date' => $date,
@@ -65,7 +82,7 @@ class Transactions {
                 'transaction' => [
                     'id' => $transaction_id,
                     'user_id' => $user_id,
-                    'amount' => $amount,
+                    'amount' => $amountUSD,
                     'category_id' => $category_id,
                     'note' => $note,
                     'date' => $date,
@@ -74,6 +91,8 @@ class Transactions {
             ];
         } catch (PDOException $e) {
             return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
+        } catch (Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
@@ -178,7 +197,7 @@ class Transactions {
     }
 
     // Update an income or expense
-    public function updateTransaction($transaction_id, $user_id, $amount, $category_id, $note = null, $date = null, $type = 'income') {
+    public function updateTransaction($transaction_id, $user_id, $amount, $category_id, $note = null, $date = null, $type = 'income', $userCurrency = 'USD') {
         try {
             $pdo = $this->db->getPdo();
 
@@ -216,6 +235,8 @@ class Transactions {
                 return ['success' => false, 'message' => 'Invalid ' . $type . ' category'];
             }
 
+            $amountUSD = $this->convertToUSD($amount, $userCurrency);
+
             $stmt = $pdo->prepare("
                 UPDATE transactions 
                 SET amount = :amount, 
@@ -225,7 +246,7 @@ class Transactions {
                 WHERE transaction_id = :transaction_id AND user_id = :user_id
             ");
             $stmt->execute([
-                'amount' => $amount,
+                'amount' => $amountUSD,
                 'category_id' => $category_id,
                 'note' => $note,
                 'date' => $date,
@@ -236,6 +257,8 @@ class Transactions {
             return ['success' => true, 'message' => ucfirst($type) . ' updated successfully'];
         } catch (PDOException $e) {
             return ['success' => false, 'message' => 'Failed to update ' . $type . ': ' . $e->getMessage()];
+        } catch (Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 

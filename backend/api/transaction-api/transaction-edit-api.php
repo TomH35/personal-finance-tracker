@@ -31,6 +31,7 @@ $category_id = $data['category_id'] ?? null;
 $note = $data['note'] ?? null;
 $date = $data['date'] ?? null;
 $type = $data['type'] ?? 'income';
+$userCurrency = $data['userCurrency'] ?? 'USD';
 
 if (!$transaction_id) {
     http_response_code(400);
@@ -38,5 +39,5 @@ if (!$transaction_id) {
     exit();
 }
 
-echo json_encode($transactions->updateTransaction($transaction_id, $user_id, $amount, $category_id, $note, $date, $type));
+echo json_encode($transactions->updateTransaction($transaction_id, $user_id, $amount, $category_id, $note, $date, $type, $userCurrency));
 ?>

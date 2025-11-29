@@ -30,6 +30,7 @@ $category_id = $data['category_id'] ?? null;
 $note = $data['note'] ?? null;
 $date = $data['date'] ?? null;
 $type = $data['type'] ?? 'income';
+$userCurrency = $data['userCurrency'] ?? 'USD';
 
-echo json_encode($transactions->createTransaction($user_id, $amount, $category_id, $note, $date, $type));
+echo json_encode($transactions->createTransaction($user_id, $amount, $category_id, $note, $date, $type, $userCurrency));
 ?>
