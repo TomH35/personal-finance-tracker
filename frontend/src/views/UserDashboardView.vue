@@ -50,6 +50,27 @@
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
           <h3 class="fw-semibold mb-4">Dashboard</h3>
 
+          <!-- Financial Overview Chart -->
+          <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-semibold mb-0">Financial Overview</h6>
+                <select v-model="selectedChartType" class="form-select form-select-sm" style="width: auto;">
+                  <option value="monthly-comparison">Monthly Income vs Expenses</option>
+                  <option value="expense-breakdown">Expense Breakdown by Category</option>
+                  <option value="income-breakdown">Income Breakdown by Category</option>
+                  <option value="balance-trend">Balance Trend Over Time</option>
+                </select>
+              </div>
+              <div style="height: 300px;">
+                <Bar v-if="selectedChartType === 'monthly-comparison'" :data="monthlyComparisonData" :options="barChartOptions" />
+                <Doughnut v-else-if="selectedChartType === 'expense-breakdown'" :data="expenseBreakdownData" :options="doughnutChartOptions" />
+                <Doughnut v-else-if="selectedChartType === 'income-breakdown'" :data="incomeBreakdownData" :options="doughnutChartOptions" />
+                <Line v-else-if="selectedChartType === 'balance-trend'" :data="balanceTrendData" :options="lineChartOptions" />
+              </div>
+            </div>
+          </div>
+
           <!-- Alert Messages -->
           <div v-if="successMessage" class="alert alert-success alert-dismissible fade show" role="alert">
             {{ successMessage }}
@@ -454,9 +475,30 @@ import { useNotificationStore } from '@/stores/notificationStore'
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { authenticatedFetch } from '@/utils/api'
+import { Bar, Doughnut, Line } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Filler
+} from 'chart.js'
+
+ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement, PointElement, LineElement, Filler)
 
 export default {
   name: 'UserDashboardView',
+  components: {
+    Bar,
+    Doughnut,
+    Line
+  },
   setup() {
     const loginStore = useLoginStore()
     const notificationStore = useNotificationStore()
@@ -501,6 +543,249 @@ export default {
     const currencySymbol = computed(() => {
       return currencySymbols[userCurrency.value] || '$'
     })
+
+    // Chart type selector
+    const selectedChartType = ref('monthly-comparison')
+
+    // Color palette for category charts
+    const categoryColors = [
+      'rgba(54, 162, 235, 0.8)',
+      'rgba(255, 99, 132, 0.8)',
+      'rgba(255, 206, 86, 0.8)',
+      'rgba(75, 192, 192, 0.8)',
+      'rgba(153, 102, 255, 0.8)',
+      'rgba(255, 159, 64, 0.8)',
+      'rgba(199, 199, 199, 0.8)',
+      'rgba(83, 102, 255, 0.8)',
+      'rgba(255, 99, 255, 0.8)',
+      'rgba(99, 255, 132, 0.8)'
+    ]
+
+    // 1. Monthly Income vs Expenses (Bar Chart)
+    const monthlyComparisonData = computed(() => {
+      const monthlyData = {}
+      
+      allTransactions.value.forEach(transaction => {
+        const date = new Date(transaction.date)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { income: 0, expense: 0 }
+        }
+        
+        const amount = convertCurrency(parseFloat(transaction.amount))
+        if (transaction.type === 'income') {
+          monthlyData[monthKey].income += amount
+        } else {
+          monthlyData[monthKey].expense += amount
+        }
+      })
+      
+      const sortedMonths = Object.keys(monthlyData).sort().slice(-6)
+      
+      const labels = sortedMonths.map(month => {
+        const [year, monthNum] = month.split('-')
+        const date = new Date(year, parseInt(monthNum) - 1)
+        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      })
+      
+      const incomeData = sortedMonths.map(month => monthlyData[month].income)
+      const expenseData = sortedMonths.map(month => monthlyData[month].expense)
+      
+      return {
+        labels: labels.length > 0 ? labels : ['No Data'],
+        datasets: [
+          {
+            label: 'Income',
+            backgroundColor: 'rgba(40, 167, 69, 0.8)',
+            borderColor: 'rgb(40, 167, 69)',
+            borderWidth: 1,
+            data: incomeData.length > 0 ? incomeData : [0]
+          },
+          {
+            label: 'Expenses',
+            backgroundColor: 'rgba(220, 53, 69, 0.8)',
+            borderColor: 'rgb(220, 53, 69)',
+            borderWidth: 1,
+            data: expenseData.length > 0 ? expenseData : [0]
+          }
+        ]
+      }
+    })
+
+    // 2. Expense Breakdown by Category (Doughnut Chart)
+    const expenseBreakdownData = computed(() => {
+      const categoryTotals = {}
+      
+      expenseList.value.forEach(transaction => {
+        const categoryName = transaction.category_name || 'Uncategorized'
+        const amount = convertCurrency(parseFloat(transaction.amount))
+        categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + amount
+      })
+      
+      const labels = Object.keys(categoryTotals)
+      const data = Object.values(categoryTotals)
+      
+      return {
+        labels: labels.length > 0 ? labels : ['No Expenses'],
+        datasets: [{
+          data: data.length > 0 ? data : [0],
+          backgroundColor: categoryColors.slice(0, labels.length || 1),
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      }
+    })
+
+    // 3. Income Breakdown by Category (Doughnut Chart)
+    const incomeBreakdownData = computed(() => {
+      const categoryTotals = {}
+      
+      incomeList.value.forEach(transaction => {
+        const categoryName = transaction.category_name || 'Uncategorized'
+        const amount = convertCurrency(parseFloat(transaction.amount))
+        categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + amount
+      })
+      
+      const labels = Object.keys(categoryTotals)
+      const data = Object.values(categoryTotals)
+      
+      return {
+        labels: labels.length > 0 ? labels : ['No Income'],
+        datasets: [{
+          data: data.length > 0 ? data : [0],
+          backgroundColor: categoryColors.slice(0, labels.length || 1),
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      }
+    })
+
+    // 4. Balance Trend Over Time (Line Chart)
+    const balanceTrendData = computed(() => {
+      const monthlyData = {}
+      
+      allTransactions.value.forEach(transaction => {
+        const date = new Date(transaction.date)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { income: 0, expense: 0 }
+        }
+        
+        const amount = convertCurrency(parseFloat(transaction.amount))
+        if (transaction.type === 'income') {
+          monthlyData[monthKey].income += amount
+        } else {
+          monthlyData[monthKey].expense += amount
+        }
+      })
+      
+      const sortedMonths = Object.keys(monthlyData).sort().slice(-6)
+      
+      const labels = sortedMonths.map(month => {
+        const [year, monthNum] = month.split('-')
+        const date = new Date(year, parseInt(monthNum) - 1)
+        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      })
+      
+      const balanceData = sortedMonths.map(month => 
+        monthlyData[month].income - monthlyData[month].expense
+      )
+      
+      // Calculate cumulative balance
+      let cumulative = 0
+      const cumulativeData = balanceData.map(balance => {
+        cumulative += balance
+        return cumulative
+      })
+      
+      return {
+        labels: labels.length > 0 ? labels : ['No Data'],
+        datasets: [
+          {
+            label: 'Monthly Balance',
+            data: balanceData.length > 0 ? balanceData : [0],
+            borderColor: 'rgb(54, 162, 235)',
+            backgroundColor: 'rgba(54, 162, 235, 0.1)',
+            fill: true,
+            tension: 0.3
+          },
+          {
+            label: 'Cumulative Balance',
+            data: cumulativeData.length > 0 ? cumulativeData : [0],
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
+            fill: false,
+            tension: 0.3,
+            borderDash: [5, 5]
+          }
+        ]
+      }
+    })
+
+    // Chart Options
+    const barChartOptions = computed(() => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top' },
+        title: { display: true, text: 'Monthly Income vs Expenses' },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.dataset.label}: ${currencySymbol.value}${context.parsed.y.toFixed(2)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { callback: (value) => currencySymbol.value + value }
+        }
+      }
+    }))
+
+    const doughnutChartOptions = computed(() => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right' },
+        title: { 
+          display: true, 
+          text: selectedChartType.value === 'expense-breakdown' 
+            ? 'Expense Breakdown by Category' 
+            : 'Income Breakdown by Category'
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const total = context.dataset.data.reduce((a, b) => a + b, 0)
+              const percentage = ((context.parsed / total) * 100).toFixed(1)
+              return `${context.label}: ${currencySymbol.value}${context.parsed.toFixed(2)} (${percentage}%)`
+            }
+          }
+        }
+      }
+    }))
+
+    const lineChartOptions = computed(() => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top' },
+        title: { display: true, text: 'Balance Trend Over Time' },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.dataset.label}: ${currencySymbol.value}${context.parsed.y.toFixed(2)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          ticks: { callback: (value) => currencySymbol.value + value }
+        }
+      }
+    }))
     
     // Convert amount from USD to user's selected currency
     const convertCurrency = (amountInUSD) => {
@@ -1121,6 +1406,14 @@ export default {
       userCurrency,
       currencySymbol,
       convertCurrency,
+      selectedChartType,
+      monthlyComparisonData,
+      expenseBreakdownData,
+      incomeBreakdownData,
+      balanceTrendData,
+      barChartOptions,
+      doughnutChartOptions,
+      lineChartOptions,
       loadTransactions,
       loadAllTransactions,
       addTransaction,
