@@ -577,10 +577,35 @@ export default {
     // Chart type selector
     const selectedChartType = ref('monthly-comparison')
 
-    // Period selector: week | month | year
+    // Period selector: week | month | year | all-time
     const selectedPeriod = ref('month') // default 'month'
 
-    // Get start date for selected period (last N days)
+    // Returns a local date key in the form "YYYY-MM-DD"
+    function dateKey(d) {
+      return (
+        d.getFullYear() +
+        '-' +
+        String(d.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(d.getDate()).padStart(2, '0')
+      )
+    }
+
+    // Date parsing from DB: supports "YYYY-MM-DD" (without time) and full ISO strings
+    // If only "YYYY-MM-DD", creates a local Date(year, month-1, day) (midnight local)
+    function parseDate(dateInput) {
+      if (!dateInput) return null
+      if (dateInput instanceof Date) return dateInput
+
+      const s = String(dateInput).trim()
+      const simpleDateMatch = /^\d{4}-\d{2}-\d{2}$/.test(s)
+      if (simpleDateMatch) {
+        const [y, m, d] = s.split('-').map(Number)
+        return new Date(y, m - 1, d) // local midnight
+      }
+      return new Date(s)
+    }
+
     const getPeriodStartDate = (period) => {
       if (period === 'all-time') return null // All-time has no limit
       const now = new Date()
@@ -617,15 +642,16 @@ export default {
       'rgba(99, 255, 132, 0.8)'
     ]
 
-    // 1. Monthly Income vs Expenses (Bar Chart)
+    // 1. Monthly Income vs Expenses (Bar Chart) 
     const monthlyComparisonData = computed(() => {
       const period = selectedPeriod.value
 
-      // Before existing filters
+      // week / month (daily)
       if (period === 'week' || period === 'month') {
         const startDate = getPeriodStartDate(period)
         const txInPeriod = allTransactions.value.filter(t => {
-          const d = new Date(t.date)
+          const d = parseDate(t.date)
+          if (!d) return false
           d.setHours(0,0,0,0)
           return d >= startDate
         })
@@ -636,12 +662,16 @@ export default {
         for (let i = days - 1; i >= 0; i--) {
           const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
           d.setDate(d.getDate() - i)
-          const key = d.toISOString().split('T')[0]
+          d.setHours(0,0,0,0)
+          const key = dateKey(d)
           dailyTotals[key] = { income: 0, expense: 0, date: new Date(d) }
         }
 
         txInPeriod.forEach(t => {
-          const key = new Date(t.date).toISOString().split('T')[0]
+          const dt = parseDate(t.date)
+          if (!dt) return
+          dt.setHours(0,0,0,0)
+          const key = dateKey(dt)
           if (!dailyTotals[key]) return
           const amount = convertCurrency(parseFloat(t.amount))
           if (t.type === 'income') dailyTotals[key].income += amount
@@ -661,13 +691,19 @@ export default {
           ]
         }
       } 
+      // year (monthly aggregation)
       else if (period === 'year') {
         const startDate = getPeriodStartDate('year')
-        const txInPeriod = allTransactions.value.filter(t => new Date(t.date) >= startDate)
+        const txInPeriod = allTransactions.value.filter(t => {
+          const d = parseDate(t.date)
+          if (!d) return false
+          d.setHours(0,0,0,0)
+          return d >= startDate
+        })
         const monthlyData = {}
 
         txInPeriod.forEach(transaction => {
-          const date = new Date(transaction.date)
+          const date = parseDate(transaction.date)
           const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
           if (!monthlyData[monthKey]) monthlyData[monthKey] = { income: 0, expense: 0 }
           const amount = convertCurrency(parseFloat(transaction.amount))
@@ -691,12 +727,12 @@ export default {
           ]
         }
       }
+      // all-time (yearly aggregation)
       else if (period === 'all-time') {
-        // Aggregation by years
         const yearlyData = {}
 
         allTransactions.value.forEach(transaction => {
-          const year = new Date(transaction.date).getFullYear()
+          const year = parseDate(transaction.date).getFullYear()
           if (!yearlyData[year]) yearlyData[year] = { income: 0, expense: 0 }
           const amount = convertCurrency(parseFloat(transaction.amount))
           if (transaction.type === 'income') yearlyData[year].income += amount
@@ -725,9 +761,10 @@ export default {
       const categoryTotals = {}
 
       expenseList.value.forEach(transaction => {
-        const d = new Date(transaction.date)
+        const d = parseDate(transaction.date)
+        if (!d) return
         d.setHours(0,0,0,0)
-        if (startDate && d < startDate) return // only if it's not all-time
+        if (startDate && d < startDate) return // Only if it's not all-time
         const categoryName = transaction.category_name || 'Uncategorized'
         const amount = convertCurrency(parseFloat(transaction.amount))
         categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + amount
@@ -754,9 +791,10 @@ export default {
       const categoryTotals = {}
 
       incomeList.value.forEach(transaction => {
-        const d = new Date(transaction.date)
+        const d = parseDate(transaction.date)
+        if (!d) return
         d.setHours(0,0,0,0)
-        if (startDate && d < startDate) return // iba ak nie je all-time
+        if (startDate && d < startDate) return // Only if it's not all-time
         const categoryName = transaction.category_name || 'Uncategorized'
         const amount = convertCurrency(parseFloat(transaction.amount))
         categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + amount
@@ -784,7 +822,7 @@ export default {
       const startDate = period !== 'all-time' ? getPeriodStartDate(period) : null
       const txInPeriod = allTransactions.value.filter(t => {
         if (period === 'all-time') return true
-        const d = new Date(t.date); d.setHours(0,0,0,0)
+        const d = parseDate(t.date); if (!d) return false; d.setHours(0,0,0,0)
         return d >= startDate
       })
 
@@ -792,7 +830,8 @@ export default {
         // Monthly balance for last 12 months
         const monthly = {}
         txInPeriod.forEach(t => {
-          const d = new Date(t.date)
+          const d = parseDate(t.date)
+          if (!d) return
           const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
           if (!monthly[key]) monthly[key] = { income: 0, expense: 0 }
           const amount = convertCurrency(parseFloat(t.amount))
@@ -820,7 +859,7 @@ export default {
         // Yearly balance for all-time
         const yearly = {}
         txInPeriod.forEach(t => {
-          const year = new Date(t.date).getFullYear()
+          const year = parseDate(t.date).getFullYear()
           if (!yearly[year]) yearly[year] = { income: 0, expense: 0 }
           const amount = convertCurrency(parseFloat(t.amount))
           if (t.type === 'income') yearly[year].income += amount
@@ -848,12 +887,16 @@ export default {
         for (let i = days -1; i >= 0; i--) {
           const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
           d.setDate(d.getDate() - i)
-          const key = d.toISOString().split('T')[0]
+          d.setHours(0,0,0,0)
+          const key = dateKey(d)
           daily[key] = { income: 0, expense: 0, date: new Date(d) }
         }
 
         txInPeriod.forEach(t => {
-          const key = new Date(t.date).toISOString().split('T')[0]
+          const dt = parseDate(t.date)
+          if (!dt) return
+          dt.setHours(0,0,0,0)
+          const key = dateKey(dt)
           if (!daily[key]) return
           const amount = convertCurrency(parseFloat(t.amount))
           if (t.type === 'income') daily[key].income += amount
