@@ -217,6 +217,7 @@
 <script>
 import { ref, onMounted, computed } from 'vue'
 import { useLoginStore } from '@/stores/loginStore'
+import { useNotificationStore } from '@/stores/notificationStore'
 import { useRouter } from 'vue-router'
 import { authenticatedFetch } from '@/utils/api'
 
@@ -224,6 +225,7 @@ export default {
   name: 'AccountSettingsView',
   setup() {
     const loginStore = useLoginStore()
+    const notificationStore = useNotificationStore()
     const router = useRouter()
 
     const successMessage = ref('')
@@ -430,6 +432,8 @@ export default {
           successMessage.value = limitForm.value.limit_id ? 'Limits updated successfully!' : 'Limits saved successfully!'
           setTimeout(()=>successMessage.value='',3000)
           await loadLimits()
+          // Reload notifications to reflect new limit calculations
+          await notificationStore.loadNotifications()
         } else {
           errorMessage.value = data.message
           setTimeout(()=>errorMessage.value='',3000)
