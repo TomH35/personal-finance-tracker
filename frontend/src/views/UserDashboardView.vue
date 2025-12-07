@@ -68,6 +68,36 @@
                 <Doughnut v-else-if="selectedChartType === 'income-breakdown'" :data="incomeBreakdownData" :options="doughnutChartOptions" />
                 <Line v-else-if="selectedChartType === 'balance-trend'" :data="balanceTrendData" :options="lineChartOptions" />
               </div>
+              <div class="btn-group btn-group-sm" role="group" aria-label="Period selector">
+                  <button 
+                    type="button" 
+                    class="btn btn-outline-secondary" 
+                    :class="{ 'active': selectedPeriod === 'week' }"
+                    @click="selectedPeriod = 'week'"
+                    title="Last 7 days"
+                  >Week</button>
+                  <button 
+                    type="button" 
+                    class="btn btn-outline-secondary" 
+                    :class="{ 'active': selectedPeriod === 'month' }"
+                    @click="selectedPeriod = 'month'"
+                    title="Last 30 days"
+                  >Month</button>
+                  <button 
+                    type="button" 
+                    class="btn btn-outline-secondary" 
+                    :class="{ 'active': selectedPeriod === 'year' }"
+                    @click="selectedPeriod = 'year'"
+                    title="Last 12 months"
+                  >Year</button>
+                  <button 
+                    type="button" 
+                    class="btn btn-outline-secondary" 
+                    :class="{ 'active': selectedPeriod === 'all-time' }"
+                    @click="selectedPeriod = 'all-time'"
+                    title="All-Time Data"
+                  >All-Time</button>
+                </div>
             </div>
           </div>
 
@@ -547,6 +577,57 @@ export default {
     // Chart type selector
     const selectedChartType = ref('monthly-comparison')
 
+    // Period selector: week | month | year | all-time
+    const selectedPeriod = ref('month') // default 'month'
+
+    // Returns a local date key in the form "YYYY-MM-DD"
+    function dateKey(d) {
+      return (
+        d.getFullYear() +
+        '-' +
+        String(d.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(d.getDate()).padStart(2, '0')
+      )
+    }
+
+    // Date parsing from DB: supports "YYYY-MM-DD" (without time) and full ISO strings
+    // If only "YYYY-MM-DD", creates a local Date(year, month-1, day) (midnight local)
+    function parseDate(dateInput) {
+      if (!dateInput) return null
+      if (dateInput instanceof Date) return dateInput
+
+      const s = String(dateInput).trim()
+      const simpleDateMatch = /^\d{4}-\d{2}-\d{2}$/.test(s)
+      if (simpleDateMatch) {
+        const [y, m, d] = s.split('-').map(Number)
+        return new Date(y, m - 1, d) // local midnight
+      }
+      return new Date(s)
+    }
+
+    const getPeriodStartDate = (period) => {
+      if (period === 'all-time') return null // All-time has no limit
+      const now = new Date()
+      let days = 30
+      if (period === 'week') days = 7
+      else if (period === 'month') days = 30
+      else if (period === 'year') days = 365
+
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      start.setDate(start.getDate() - (days - 1))
+      start.setHours(0, 0, 0, 0)
+      return start
+    }
+
+    // Format day label 'Mon 12/12' or month 'Dec 2025'
+    const formatDayLabel = (date) => {
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })
+    }
+    const formatMonthLabel = (date) => {
+      return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    }
+
     // Color palette for category charts
     const categoryColors = [
       'rgba(54, 162, 235, 0.8)',
@@ -561,71 +642,137 @@ export default {
       'rgba(99, 255, 132, 0.8)'
     ]
 
-    // 1. Monthly Income vs Expenses (Bar Chart)
+    // 1. Monthly Income vs Expenses (Bar Chart) 
     const monthlyComparisonData = computed(() => {
-      const monthlyData = {}
-      
-      allTransactions.value.forEach(transaction => {
-        const date = new Date(transaction.date)
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-        
-        if (!monthlyData[monthKey]) {
-          monthlyData[monthKey] = { income: 0, expense: 0 }
+      const period = selectedPeriod.value
+
+      // week / month (daily)
+      if (period === 'week' || period === 'month') {
+        const startDate = getPeriodStartDate(period)
+        const txInPeriod = allTransactions.value.filter(t => {
+          const d = parseDate(t.date)
+          if (!d) return false
+          d.setHours(0,0,0,0)
+          return d >= startDate
+        })
+
+        const dailyTotals = {}
+        const now = new Date()
+        const days = period === 'week' ? 7 : 30
+        for (let i = days - 1; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          d.setDate(d.getDate() - i)
+          d.setHours(0,0,0,0)
+          const key = dateKey(d)
+          dailyTotals[key] = { income: 0, expense: 0, date: new Date(d) }
         }
-        
-        const amount = convertCurrency(parseFloat(transaction.amount))
-        if (transaction.type === 'income') {
-          monthlyData[monthKey].income += amount
-        } else {
-          monthlyData[monthKey].expense += amount
+
+        txInPeriod.forEach(t => {
+          const dt = parseDate(t.date)
+          if (!dt) return
+          dt.setHours(0,0,0,0)
+          const key = dateKey(dt)
+          if (!dailyTotals[key]) return
+          const amount = convertCurrency(parseFloat(t.amount))
+          if (t.type === 'income') dailyTotals[key].income += amount
+          else dailyTotals[key].expense += amount
+        })
+
+        const keys = Object.keys(dailyTotals).sort()
+        const labels = keys.map(k => formatDayLabel(dailyTotals[k].date))
+        const incomeData = keys.map(k => dailyTotals[k].income)
+        const expenseData = keys.map(k => dailyTotals[k].expense)
+
+        return {
+          labels: labels.length > 0 ? labels : ['No Data'],
+          datasets: [
+            { label: 'Income', backgroundColor: 'rgba(40, 167, 69, 0.8)', borderColor: 'rgb(40, 167, 69)', borderWidth: 1, data: incomeData.length ? incomeData : [0] },
+            { label: 'Expenses', backgroundColor: 'rgba(220, 53, 69, 0.8)', borderColor: 'rgb(220, 53, 69)', borderWidth: 1, data: expenseData.length ? expenseData : [0] }
+          ]
         }
-      })
-      
-      const sortedMonths = Object.keys(monthlyData).sort().slice(-6)
-      
-      const labels = sortedMonths.map(month => {
-        const [year, monthNum] = month.split('-')
-        const date = new Date(year, parseInt(monthNum) - 1)
-        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      })
-      
-      const incomeData = sortedMonths.map(month => monthlyData[month].income)
-      const expenseData = sortedMonths.map(month => monthlyData[month].expense)
-      
-      return {
-        labels: labels.length > 0 ? labels : ['No Data'],
-        datasets: [
-          {
-            label: 'Income',
-            backgroundColor: 'rgba(40, 167, 69, 0.8)',
-            borderColor: 'rgb(40, 167, 69)',
-            borderWidth: 1,
-            data: incomeData.length > 0 ? incomeData : [0]
-          },
-          {
-            label: 'Expenses',
-            backgroundColor: 'rgba(220, 53, 69, 0.8)',
-            borderColor: 'rgb(220, 53, 69)',
-            borderWidth: 1,
-            data: expenseData.length > 0 ? expenseData : [0]
-          }
-        ]
+      } 
+      // year (monthly aggregation)
+      else if (period === 'year') {
+        const startDate = getPeriodStartDate('year')
+        const txInPeriod = allTransactions.value.filter(t => {
+          const d = parseDate(t.date)
+          if (!d) return false
+          d.setHours(0,0,0,0)
+          return d >= startDate
+        })
+        const monthlyData = {}
+
+        txInPeriod.forEach(transaction => {
+          const date = parseDate(transaction.date)
+          const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+          if (!monthlyData[monthKey]) monthlyData[monthKey] = { income: 0, expense: 0 }
+          const amount = convertCurrency(parseFloat(transaction.amount))
+          if (transaction.type === 'income') monthlyData[monthKey].income += amount
+          else monthlyData[monthKey].expense += amount
+        })
+
+        const sortedMonths = Object.keys(monthlyData).sort()
+        const labels = sortedMonths.map(month => {
+          const [y, m] = month.split('-')
+          return formatMonthLabel(new Date(y, parseInt(m) - 1))
+        })
+        const incomeData = sortedMonths.map(m => monthlyData[m].income)
+        const expenseData = sortedMonths.map(m => monthlyData[m].expense)
+
+        return {
+          labels: labels.length > 0 ? labels : ['No Data'],
+          datasets: [
+            { label: 'Income', backgroundColor: 'rgba(40, 167, 69, 0.8)', borderColor: 'rgb(40, 167, 69)', borderWidth: 1, data: incomeData.length ? incomeData : [0] },
+            { label: 'Expenses', backgroundColor: 'rgba(220, 53, 69, 0.8)', borderColor: 'rgb(220, 53, 69)', borderWidth: 1, data: expenseData.length ? expenseData : [0] }
+          ]
+        }
+      }
+      // all-time (yearly aggregation)
+      else if (period === 'all-time') {
+        const yearlyData = {}
+
+        allTransactions.value.forEach(transaction => {
+          const year = parseDate(transaction.date).getFullYear()
+          if (!yearlyData[year]) yearlyData[year] = { income: 0, expense: 0 }
+          const amount = convertCurrency(parseFloat(transaction.amount))
+          if (transaction.type === 'income') yearlyData[year].income += amount
+          else yearlyData[year].expense += amount
+        })
+
+        const sortedYears = Object.keys(yearlyData).sort((a,b) => a - b)
+        const labels = sortedYears
+        const incomeData = sortedYears.map(y => yearlyData[y].income)
+        const expenseData = sortedYears.map(y => yearlyData[y].expense)
+
+        return {
+          labels: labels.length > 0 ? labels : ['No Data'],
+          datasets: [
+            { label: 'Income', backgroundColor: 'rgba(40, 167, 69, 0.8)', borderColor: 'rgb(40, 167, 69)', borderWidth: 1, data: incomeData.length ? incomeData : [0] },
+            { label: 'Expenses', backgroundColor: 'rgba(220, 53, 69, 0.8)', borderColor: 'rgb(220, 53, 69)', borderWidth: 1, data: expenseData.length ? expenseData : [0] }
+          ]
+        }
       }
     })
 
     // 2. Expense Breakdown by Category (Doughnut Chart)
     const expenseBreakdownData = computed(() => {
+      const period = selectedPeriod.value
+      const startDate = getPeriodStartDate(period)
       const categoryTotals = {}
-      
+
       expenseList.value.forEach(transaction => {
+        const d = parseDate(transaction.date)
+        if (!d) return
+        d.setHours(0,0,0,0)
+        if (startDate && d < startDate) return // Only if it's not all-time
         const categoryName = transaction.category_name || 'Uncategorized'
         const amount = convertCurrency(parseFloat(transaction.amount))
         categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + amount
       })
-      
+
       const labels = Object.keys(categoryTotals)
       const data = Object.values(categoryTotals)
-      
+
       return {
         labels: labels.length > 0 ? labels : ['No Expenses'],
         datasets: [{
@@ -639,19 +786,25 @@ export default {
 
     // 3. Income Breakdown by Category (Doughnut Chart)
     const incomeBreakdownData = computed(() => {
+      const period = selectedPeriod.value
+      const startDate = getPeriodStartDate(period)
       const categoryTotals = {}
-      
+
       incomeList.value.forEach(transaction => {
+        const d = parseDate(transaction.date)
+        if (!d) return
+        d.setHours(0,0,0,0)
+        if (startDate && d < startDate) return // Only if it's not all-time
         const categoryName = transaction.category_name || 'Uncategorized'
         const amount = convertCurrency(parseFloat(transaction.amount))
         categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + amount
       })
-      
+
       const labels = Object.keys(categoryTotals)
       const data = Object.values(categoryTotals)
-      
+
       return {
-        labels: labels.length > 0 ? labels : ['No Income'],
+        labels: labels.length > 0 ? labels : ['No Expenses'],
         datasets: [{
           data: data.length > 0 ? data : [0],
           backgroundColor: categoryColors.slice(0, labels.length || 1),
@@ -663,64 +816,106 @@ export default {
 
     // 4. Balance Trend Over Time (Line Chart)
     const balanceTrendData = computed(() => {
-      const monthlyData = {}
-      
-      allTransactions.value.forEach(transaction => {
-        const date = new Date(transaction.date)
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-        
-        if (!monthlyData[monthKey]) {
-          monthlyData[monthKey] = { income: 0, expense: 0 }
+      const period = selectedPeriod.value
+
+      // All-time does not require startDate, others do
+      const startDate = period !== 'all-time' ? getPeriodStartDate(period) : null
+      const txInPeriod = allTransactions.value.filter(t => {
+        if (period === 'all-time') return true
+        const d = parseDate(t.date); if (!d) return false; d.setHours(0,0,0,0)
+        return d >= startDate
+      })
+
+      if (period === 'year') {
+        // Monthly balance for last 12 months
+        const monthly = {}
+        txInPeriod.forEach(t => {
+          const d = parseDate(t.date)
+          if (!d) return
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+          if (!monthly[key]) monthly[key] = { income: 0, expense: 0 }
+          const amount = convertCurrency(parseFloat(t.amount))
+          if (t.type === 'income') monthly[key].income += amount
+          else monthly[key].expense += amount
+        })
+
+        const keys = Object.keys(monthly).sort()
+        const labels = keys.map(k => {
+          const [y, m] = k.split('-')
+          return formatMonthLabel(new Date(y, parseInt(m)-1))
+        })
+        const balanceData = keys.map(k => monthly[k].income - monthly[k].expense)
+        let cumulative = 0
+        const cumulativeData = balanceData.map(b => { cumulative += b; return cumulative })
+
+        return {
+          labels: labels.length > 0 ? labels : ['No Data'],
+          datasets: [
+            { label: 'Monthly Balance', data: balanceData.length ? balanceData : [0], borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.1)', fill: true, tension: 0.3 },
+            { label: 'Cumulative Balance', data: cumulativeData.length ? cumulativeData : [0], borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.1)', fill: false, tension: 0.3, borderDash: [5,5] }
+          ]
         }
-        
-        const amount = convertCurrency(parseFloat(transaction.amount))
-        if (transaction.type === 'income') {
-          monthlyData[monthKey].income += amount
-        } else {
-          monthlyData[monthKey].expense += amount
+      } else if (period === 'all-time') {
+        // Yearly balance for all-time
+        const yearly = {}
+        txInPeriod.forEach(t => {
+          const year = parseDate(t.date).getFullYear()
+          if (!yearly[year]) yearly[year] = { income: 0, expense: 0 }
+          const amount = convertCurrency(parseFloat(t.amount))
+          if (t.type === 'income') yearly[year].income += amount
+          else yearly[year].expense += amount
+        })
+
+        const sortedYears = Object.keys(yearly).sort((a, b) => a - b)
+        const labels = sortedYears
+        const balanceData = sortedYears.map(y => yearly[y].income - yearly[y].expense)
+        let cumulative = 0
+        const cumulativeData = balanceData.map(b => { cumulative += b; return cumulative })
+
+        return {
+          labels: labels.length > 0 ? labels : ['No Data'],
+          datasets: [
+            { label: 'Yearly Balance', data: balanceData.length ? balanceData : [0], borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.1)', fill: true, tension: 0.3 },
+            { label: 'Cumulative Balance', data: cumulativeData.length ? cumulativeData : [0], borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.1)', fill: false, tension: 0.3, borderDash: [5,5] }
+          ]
         }
-      })
-      
-      const sortedMonths = Object.keys(monthlyData).sort().slice(-6)
-      
-      const labels = sortedMonths.map(month => {
-        const [year, monthNum] = month.split('-')
-        const date = new Date(year, parseInt(monthNum) - 1)
-        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-      })
-      
-      const balanceData = sortedMonths.map(month => 
-        monthlyData[month].income - monthlyData[month].expense
-      )
-      
-      // Calculate cumulative balance
-      let cumulative = 0
-      const cumulativeData = balanceData.map(balance => {
-        cumulative += balance
-        return cumulative
-      })
-      
-      return {
-        labels: labels.length > 0 ? labels : ['No Data'],
-        datasets: [
-          {
-            label: 'Monthly Balance',
-            data: balanceData.length > 0 ? balanceData : [0],
-            borderColor: 'rgb(54, 162, 235)',
-            backgroundColor: 'rgba(54, 162, 235, 0.1)',
-            fill: true,
-            tension: 0.3
-          },
-          {
-            label: 'Cumulative Balance',
-            data: cumulativeData.length > 0 ? cumulativeData : [0],
-            borderColor: 'rgb(75, 192, 192)',
-            backgroundColor: 'rgba(75, 192, 192, 0.1)',
-            fill: false,
-            tension: 0.3,
-            borderDash: [5, 5]
-          }
-        ]
+      } else {
+        // Daily for week/month
+        const now = new Date()
+        const days = period === 'week' ? 7 : 30
+        const daily = {}
+        for (let i = days -1; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          d.setDate(d.getDate() - i)
+          d.setHours(0,0,0,0)
+          const key = dateKey(d)
+          daily[key] = { income: 0, expense: 0, date: new Date(d) }
+        }
+
+        txInPeriod.forEach(t => {
+          const dt = parseDate(t.date)
+          if (!dt) return
+          dt.setHours(0,0,0,0)
+          const key = dateKey(dt)
+          if (!daily[key]) return
+          const amount = convertCurrency(parseFloat(t.amount))
+          if (t.type === 'income') daily[key].income += amount
+          else daily[key].expense += amount
+        })
+
+        const keys = Object.keys(daily).sort()
+        const labels = keys.map(k => formatDayLabel(daily[k].date))
+        const balanceData = keys.map(k => daily[k].income - daily[k].expense)
+        let cumulative = 0
+        const cumulativeData = balanceData.map(b => { cumulative += b; return cumulative })
+
+        return {
+          labels: labels.length > 0 ? labels : ['No Data'],
+          datasets: [
+            { label: 'Daily Balance', data: balanceData.length ? balanceData : [0], borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.1)', fill: true, tension: 0.3 },
+            { label: 'Cumulative Balance', data: cumulativeData.length ? cumulativeData : [0], borderColor: 'rgb(75, 192, 192)', backgroundColor: 'rgba(75, 192, 192, 0.1)', fill: false, tension: 0.3, borderDash: [5,5] }
+          ]
+        }
       }
     })
 
@@ -1407,6 +1602,7 @@ export default {
       currencySymbol,
       convertCurrency,
       selectedChartType,
+      selectedPeriod,
       monthlyComparisonData,
       expenseBreakdownData,
       incomeBreakdownData,
