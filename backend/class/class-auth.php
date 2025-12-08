@@ -25,6 +25,61 @@ class Auth {
     }
 
     /**
+     * Check if password meets security requirements
+     * 
+     * Requirements:
+     * - At least 8 characters long
+     * - At least one uppercase letter (A-Z)
+     * - At least one lowercase letter (a-z)
+     * - At least one number (0-9)
+     * - At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)
+     * 
+     * @param string $password The password to validate
+     * @return array Response array with success status and message
+     */
+    public function checkPasswordRequirements($password) {
+        $errors = [];
+
+        // Check minimum length
+        if (strlen($password) < 8) {
+            $errors[] = 'Password must be at least 8 characters long';
+        }
+
+        // Check for at least one uppercase letter
+        if (!preg_match('/[A-Z]/', $password)) {
+            $errors[] = 'Password must contain at least one uppercase letter';
+        }
+
+        // Check for at least one lowercase letter
+        if (!preg_match('/[a-z]/', $password)) {
+            $errors[] = 'Password must contain at least one lowercase letter';
+        }
+
+        // Check for at least one number
+        if (!preg_match('/[0-9]/', $password)) {
+            $errors[] = 'Password must contain at least one number';
+        }
+
+        // Check for at least one special character
+        if (!preg_match('/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/', $password)) {
+            $errors[] = 'Password must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)';
+        }
+
+        if (count($errors) > 0) {
+            return [
+                'success' => false,
+                'message' => implode('. ', $errors),
+                'errors' => $errors
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => 'Password meets all requirements'
+        ];
+    }
+
+    /**
      * Register a new user
      * 
      * @param string $username The username
@@ -53,12 +108,10 @@ class Auth {
                 ];
             }
 
-            // Validate password length (minimum 6 characters)
-            if (strlen($password) < 6) {
-                return [
-                    'success' => false,
-                    'message' => 'Password must be at least 6 characters long'
-                ];
+            // Validate password requirements
+            $passwordCheck = $this->checkPasswordRequirements($password);
+            if (!$passwordCheck['success']) {
+                return $passwordCheck;
             }
 
             // Check if username already exists

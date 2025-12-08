@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useLoginStore } from '@/stores/loginStore'
 import { authenticatedFetch } from '@/utils/api'
 
@@ -11,6 +11,23 @@ const userError = ref('')
 
 const newUser = ref({ username: '', email: '', password: '', role: 'user' })
 const editUserData = ref({ user_id: null, username: '', email: '', role: 'user' })
+
+// Password requirements validation for new user
+const newUserPasswordRequirements = computed(() => {
+  const password = newUser.value.password
+  return {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)
+  }
+})
+
+const newUserPasswordRequirementsMet = computed(() => {
+  const reqs = newUserPasswordRequirements.value
+  return reqs.length && reqs.uppercase && reqs.lowercase && reqs.number && reqs.special
+})
 
 // Categories
 const categories = ref([])
@@ -57,6 +74,12 @@ const openAddUserModal = async () => {
 
 // CREATE USER
 const createUser = async () => {
+  // Validate password requirements
+  if (!newUserPasswordRequirementsMet.value) {
+    alert('Password does not meet security requirements. Please ensure it meets all requirements listed.')
+    return
+  }
+
   try {
     // Use the correct API based on selected role
     const apiUrl = newUser.value.role === 'admin'
@@ -372,7 +395,36 @@ const deleteCategory = async (id) => {
           <div class="modal-body">
             <input v-model="newUser.username" class="form-control mb-2" placeholder="Username" />
             <input v-model="newUser.email" class="form-control mb-2" placeholder="Email" />
-            <input v-model="newUser.password" type="password" class="form-control mb-2" placeholder="Password" />
+            <input 
+              v-model="newUser.password" 
+              type="password" 
+              class="form-control mb-2" 
+              :class="{ 'is-invalid': newUser.password && !newUserPasswordRequirementsMet }"
+              placeholder="Password" 
+            />
+            <!-- Password Requirements -->
+            <div v-if="newUser.password" class="small mb-2">
+              <div :class="newUserPasswordRequirements.length ? 'text-success' : 'text-danger'">
+                <i :class="newUserPasswordRequirements.length ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+                At least 8 characters
+              </div>
+              <div :class="newUserPasswordRequirements.uppercase ? 'text-success' : 'text-danger'">
+                <i :class="newUserPasswordRequirements.uppercase ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+                At least one uppercase letter (A-Z)
+              </div>
+              <div :class="newUserPasswordRequirements.lowercase ? 'text-success' : 'text-danger'">
+                <i :class="newUserPasswordRequirements.lowercase ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+                At least one lowercase letter (a-z)
+              </div>
+              <div :class="newUserPasswordRequirements.number ? 'text-success' : 'text-danger'">
+                <i :class="newUserPasswordRequirements.number ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+                At least one number (0-9)
+              </div>
+              <div :class="newUserPasswordRequirements.special ? 'text-success' : 'text-danger'">
+                <i :class="newUserPasswordRequirements.special ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+                At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)
+              </div>
+            </div>
             <select v-model="newUser.role" class="form-select">
               <option value="user">User</option>
               <option value="admin">Admin</option>
