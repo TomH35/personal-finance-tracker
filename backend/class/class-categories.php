@@ -34,17 +34,52 @@ class Categories {
                 return ['success' => false, 'message' => 'Category name is required'];
             }
 
-            if ($this->categoryExists($name)) {
-                return ['success' => false, 'message' => 'Category name already exists'];
+            // Special logic for admin creating predefined categories
+            if ($is_predefined) {
+                // Check if a category with this name already exists
+                $stmt = $pdo->prepare("SELECT category_id, is_predefined FROM categories WHERE LOWER(name) = LOWER(?)");
+                $stmt->execute([$name]);
+                $existingCategory = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($existingCategory) {
+                    // Category exists - check if it's not predefined (is_predefined = 0)
+                    if ($existingCategory['is_predefined'] == 0) {
+                        // Update the existing category to be predefined and set user_id to NULL
+                        $updateStmt = $pdo->prepare("UPDATE categories SET is_predefined = 1, user_id = NULL WHERE category_id = ?");
+                        $updateStmt->execute([$existingCategory['category_id']]);
+
+                        return [
+                            'success' => true,
+                            'message' => 'Category updated to predefined successfully',
+                            'category' => [
+                                'id' => $existingCategory['category_id'],
+                                'name' => $name,
+                                'user_id' => null,
+                                'type' => $type,
+                                'is_predefined' => true
+                            ]
+                        ];
+                    } else {
+                        // Category already exists and is already predefined
+                        return ['success' => false, 'message' => 'Category name already exists'];
+                    }
+                }
+                // If category doesn't exist, proceed to create it below
+            } else {
+                // Regular user - check if category exists at all
+                if ($this->categoryExists($name)) {
+                    return ['success' => false, 'message' => 'Category name already exists'];
+                }
             }
 
+            // Create new category
             $stmt = $pdo->prepare("
                 INSERT INTO categories (name, user_id, type, is_predefined)
                 VALUES (:name, :user_id, :type, :is_predefined)
             ");
             $stmt->execute([
                 'name' => $name,
-                'user_id' => $user_id,
+                'user_id' => $is_predefined ? null : $user_id,
                 'type' => $type,
                 'is_predefined' => $is_predefined ? 1 : 0
             ]);
@@ -57,7 +92,7 @@ class Categories {
                 'category' => [
                     'id' => $category_id,
                     'name' => $name,
-                    'user_id' => $user_id,
+                    'user_id' => $is_predefined ? null : $user_id,
                     'type' => $type,
                     'is_predefined' => $is_predefined
                 ]
