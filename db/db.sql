@@ -120,3 +120,17 @@ CREATE TABLE refresh_tokens (
     INDEX idx_user_expired (user_id, expired)
 );
 
+-- ========================================
+--  TABLE: tips
+-- ========================================
+-- Each record represents one financial tip created by admin
+-- to be displayed to users in the dashboard carousel.
+CREATE TABLE tips (
+    tip_id INT AUTO_INCREMENT PRIMARY KEY,            -- Tip ID
+    title VARCHAR(255) NOT NULL,                      -- Tip title
+    content TEXT NOT NULL,                            -- Tip content
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,    -- Creation time
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP   -- Last update time
+);
+
+
