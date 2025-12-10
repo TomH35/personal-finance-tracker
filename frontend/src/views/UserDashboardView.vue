@@ -61,9 +61,9 @@
                     class="carousel-item"
                     :class="{ active: index === 0 }"
                   >
-                    <div class="text-center py-3">
+                    <div class="text-center py-3 px-5">
                       <h5 class="fw-bold mb-3">💡 {{ tip.title }}</h5>
-                      <p class="mb-0">{{ tip.content }}</p>
+                      <p class="mb-0 mx-auto" style="max-width: 700px;">{{ tip.content }}</p>
                     </div>
                   </div>
                 </div>
