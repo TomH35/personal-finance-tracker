@@ -60,7 +60,7 @@ const showAlert = (message, duration = 3000) => {
 // Fetch users and categories
 onMounted(async () => {
   try {
-    const response = await authenticatedFetch('/backend/api/user-api/user-get-all-api.php')
+    const response = await authenticatedFetch('/backend/api/admin-api/user-get-all-api.php')
     const data = await response.json()
     if (data.success) users.value = data.users
     else userError.value = data.message
@@ -123,7 +123,7 @@ const openEditUserModal = async (user) => {
 // UPDATE USER
 const updateUser = async () => {
   try {
-    const res = await authenticatedFetch('/backend/api/user-api/user-edit-api.php', {
+    const res = await authenticatedFetch('/backend/api/admin-api/user-edit-api.php', {
       method: 'POST',
       body: JSON.stringify(editUserData.value)
     })
@@ -147,7 +147,7 @@ const deleteUser = async (user_id) => {
   if (!confirm('Are you sure you want to delete this user?')) return
 
   try {
-    const res = await authenticatedFetch('/backend/api/user-api/user-delete-api.php', {
+    const res = await authenticatedFetch('/backend/api/admin-api/user-delete-api.php', {
       method: 'POST',
       body: JSON.stringify({ user_id })
     })
