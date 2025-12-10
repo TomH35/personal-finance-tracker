@@ -1,6 +1,6 @@
 <?php
 // CORS hlavičky – musia byť úplne na začiatku
-header('Access-Control-Allow-Origin: http://localhost:5173'); // alebo '*', ak netreba credentials
+header('Access-Control-Allow-Origin: *'); // alebo '*', ak netreba credentials
 header('Access-Control-Allow-Methods: DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
