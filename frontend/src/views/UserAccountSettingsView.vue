@@ -462,6 +462,8 @@ export default {
         if (data.success) {
           successMessage.value = 'Profile updated successfully!'
           setTimeout(() => successMessage.value = '', 3000)
+          // Reload notifications to reflect currency change
+          await notificationStore.loadNotifications()
         } else {
           errorMessage.value = data.message || 'Failed to update profile'
           setTimeout(() => errorMessage.value = '', 3000)

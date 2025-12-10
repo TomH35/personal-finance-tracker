@@ -12,6 +12,24 @@ class Notifications
     }
 
     /**
+     * Convert amount from USD to user's currency
+     */
+    private function convertFromUSD($amountUSD, $userCurrency) {
+        $exchangeRates = [
+            'USD' => 1.0,
+            'EUR' => 0.92,
+            'PLN' => 4.05,
+            'CZK' => 23.15
+        ];
+
+        if (!isset($exchangeRates[$userCurrency])) {
+            return $amountUSD; // Fallback to USD if currency not supported
+        }
+
+        return round($amountUSD * $exchangeRates[$userCurrency], 2);
+    }
+
+    /**
      * Create a new notification for a user
      */
     public function createNotification($user_id, $type, $message, $limit_id = null)
@@ -246,12 +264,13 @@ class Notifications
     public function checkAndNotifySpendingLimits($user_id, $transaction_date = null, $allow_popup = true)
     {
         try {
-            // Get user's active spending limits
+            // Get user's active spending limits and currency
             $stmt = $this->db->prepare("
-                SELECT limit_id, warning_limit, critical_limit, enabled 
-                FROM spending_limits 
-                WHERE user_id = :user_id AND enabled = 1
-                ORDER BY limit_id DESC
+                SELECT sl.limit_id, sl.warning_limit, sl.critical_limit, sl.enabled, u.currency
+                FROM spending_limits sl
+                JOIN users u ON sl.user_id = u.user_id
+                WHERE sl.user_id = :user_id AND sl.enabled = 1
+                ORDER BY sl.limit_id DESC
                 LIMIT 1
             ");
             $stmt->execute(['user_id' => $user_id]);
@@ -261,6 +280,16 @@ class Notifications
                 // No active limits, nothing to check
                 return ['success' => true, 'message' => 'No active limits to check'];
             }
+
+            // Get currency symbol
+            $currency = $limit['currency'] ?? 'USD';
+            $currencySymbols = [
+                'USD' => '$',
+                'EUR' => '€',
+                'PLN' => 'zł',
+                'CZK' => 'Kč'
+            ];
+            $currencySymbol = $currencySymbols[$currency] ?? '$';
 
             $warning_limit = (float)$limit['warning_limit'];
             $critical_limit = (float)$limit['critical_limit'];
@@ -333,12 +362,17 @@ class Notifications
 
             // If critical limit is exceeded
             if ($should_notify_critical) {
-                $overage = $monthly_expenses - $critical_limit;
+                // Convert USD amounts to user's currency for display
+                $monthly_expenses_display = $this->convertFromUSD($monthly_expenses, $currency);
+                $overage_display = $this->convertFromUSD($monthly_expenses - $critical_limit, $currency);
+                
                 $message = sprintf(
-                    "%s\nCritical spending limit exceeded! You have spent $%.2f (over by $%.2f)",
+                    "%s\nCritical spending limit exceeded! You have spent %s%.2f (over by %s%.2f)",
                     $date_obj->format('F Y'),
-                    $monthly_expenses,
-                    $overage
+                    $currencySymbol,
+                    $monthly_expenses_display,
+                    $currencySymbol,
+                    $overage_display
                 );
 
                 if ($existing_critical) {
@@ -369,12 +403,17 @@ class Notifications
             }
             // If warning limit is exceeded (but not critical)
             elseif ($should_notify_warning) {
-                $overage = $monthly_expenses - $warning_limit;
+                // Convert USD amounts to user's currency for display
+                $monthly_expenses_display = $this->convertFromUSD($monthly_expenses, $currency);
+                $overage_display = $this->convertFromUSD($monthly_expenses - $warning_limit, $currency);
+                
                 $message = sprintf(
-                    "%s\nWarning - Spending limit threshold reached! You have spent $%.2f (over by $%.2f)",
+                    "%s\nWarning - Spending limit threshold reached! You have spent %s%.2f (over by %s%.2f)",
                     $date_obj->format('F Y'),
-                    $monthly_expenses,
-                    $overage
+                    $currencySymbol,
+                    $monthly_expenses_display,
+                    $currencySymbol,
+                    $overage_display
                 );
 
                 if ($existing_warning) {
@@ -422,6 +461,39 @@ class Notifications
             return [
                 'success' => false,
                 'message' => 'Failed to check spending limits: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Delete all notifications for current month for a specific limit
+     * Used when limit is disabled
+     */
+    public function deleteCurrentMonthNotifications($user_id, $limit_id)
+    {
+        try {
+            $current_month = date('Y-m');
+            $stmt = $this->db->prepare("
+                DELETE FROM notifications 
+                WHERE user_id = :user_id 
+                AND limit_id = :limit_id
+                AND DATE_FORMAT(created_at, '%Y-%m') = :current_month
+            ");
+            $stmt->execute([
+                'user_id' => $user_id,
+                'limit_id' => $limit_id,
+                'current_month' => $current_month
+            ]);
+
+            return [
+                'success' => true,
+                'message' => 'Current month notifications deleted',
+                'count' => $stmt->rowCount()
+            ];
+        } catch (PDOException $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to delete current month notifications: ' . $e->getMessage()
             ];
         }
     }
@@ -497,6 +569,144 @@ class Notifications
             return [
                 'success' => false,
                 'message' => 'Failed to recalculate limits: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Recalculate all limit notifications when user changes currency
+     * This updates all existing notifications to reflect the new currency
+     * Preserves the is_read status of notifications
+     */
+    public function recalculateAllNotificationsForCurrencyChange($user_id)
+    {
+        try {
+            // Get user's active limit and new currency
+            $stmt = $this->db->prepare("
+                SELECT sl.limit_id, sl.warning_limit, sl.critical_limit, u.currency
+                FROM spending_limits sl
+                JOIN users u ON sl.user_id = u.user_id
+                WHERE sl.user_id = :user_id AND sl.enabled = 1
+                ORDER BY sl.limit_id DESC
+                LIMIT 1
+            ");
+            $stmt->execute(['user_id' => $user_id]);
+            $limit = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$limit) {
+                return ['success' => true, 'message' => 'No active limits to recalculate'];
+            }
+
+            $currency = $limit['currency'] ?? 'USD';
+            $currencySymbols = [
+                'USD' => '$',
+                'EUR' => '€',
+                'PLN' => 'zł',
+                'CZK' => 'Kč'
+            ];
+            $currencySymbol = $currencySymbols[$currency] ?? '$';
+            $warning_limit = (float)$limit['warning_limit'];
+            $critical_limit = (float)$limit['critical_limit'];
+
+            // Get all existing limit notifications for this user
+            $stmt = $this->db->prepare("
+                SELECT notification_id, message, type, is_read
+                FROM notifications 
+                WHERE user_id = :user_id 
+                AND limit_id = :limit_id
+                AND (type = 'warning' OR type = 'critical')
+            ");
+            $stmt->execute([
+                'user_id' => $user_id,
+                'limit_id' => $limit['limit_id']
+            ]);
+            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $updated_count = 0;
+            
+            // Update each notification with new currency
+            foreach ($notifications as $notif) {
+                // Extract month from message (e.g., "December 2025")
+                if (preg_match('/^([A-Za-z]+\s+\d{4})/', $notif['message'], $matches)) {
+                    $month_year = $matches[1];
+                    
+                    // Parse month to get date range
+                    $date_obj = DateTime::createFromFormat('F Y', $month_year);
+                    if ($date_obj) {
+                        $month_start = $date_obj->format('Y-m-01');
+                        $month_end = $date_obj->format('Y-m-t');
+                        
+                        // Calculate total expenses for this month (in USD)
+                        $stmt = $this->db->prepare("
+                            SELECT COALESCE(SUM(amount), 0) AS monthly_total
+                            FROM transactions
+                            WHERE user_id = :user_id 
+                            AND type = 'expense'
+                            AND date >= :start_date
+                            AND date <= :end_date
+                        ");
+                        $stmt->execute([
+                            'user_id' => $user_id,
+                            'start_date' => $month_start,
+                            'end_date' => $month_end
+                        ]);
+                        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                        $monthly_expenses = (float)$result['monthly_total'];
+                        
+                        // Convert to user's currency for display
+                        $monthly_expenses_display = $this->convertFromUSD($monthly_expenses, $currency);
+                        
+                        // Generate new message based on notification type
+                        $new_message = '';
+                        if ($notif['type'] === 'critical' && $monthly_expenses >= $critical_limit) {
+                            $overage_display = $this->convertFromUSD($monthly_expenses - $critical_limit, $currency);
+                            $new_message = sprintf(
+                                "%s\nCritical spending limit exceeded! You have spent %s%.2f (over by %s%.2f)",
+                                $month_year,
+                                $currencySymbol,
+                                $monthly_expenses_display,
+                                $currencySymbol,
+                                $overage_display
+                            );
+                        } elseif ($notif['type'] === 'warning' && $monthly_expenses >= $warning_limit) {
+                            $overage_display = $this->convertFromUSD($monthly_expenses - $warning_limit, $currency);
+                            $new_message = sprintf(
+                                "%s\nWarning - Spending limit threshold reached! You have spent %s%.2f (over by %s%.2f)",
+                                $month_year,
+                                $currencySymbol,
+                                $monthly_expenses_display,
+                                $currencySymbol,
+                                $overage_display
+                            );
+                        }
+                        
+                        // Update notification with new message if we generated one
+                        if ($new_message) {
+                            $stmt = $this->db->prepare("
+                                UPDATE notifications 
+                                SET message = :message 
+                                WHERE notification_id = :notification_id
+                            ");
+                            $stmt->execute([
+                                'message' => $new_message,
+                                'notification_id' => $notif['notification_id']
+                            ]);
+                            $updated_count++;
+                        }
+                    }
+                }
+            }
+            
+            return [
+                'success' => true,
+                'message' => 'Notifications updated for currency change',
+                'updated_count' => $updated_count
+            ];
+            
+        } catch (PDOException $e) {
+            return [
+                'success' => false,
+                'message' => 'Failed to recalculate notifications: ' . $e->getMessage()
             ];
         }
     }
