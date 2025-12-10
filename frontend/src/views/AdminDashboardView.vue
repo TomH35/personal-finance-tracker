@@ -5,6 +5,34 @@ import { authenticatedFetch } from '@/utils/api'
 
 const loginStore = useLoginStore()
 
+const currencySymbols = {
+  USD: '$',
+  EUR: '€',
+  PLN: 'zł',
+  CZK: 'Kč'
+}
+
+const exchangeRates = {
+  USD: 1.0,
+  EUR: 0.92,
+  PLN: 4.05,
+  CZK: 23.15
+}
+
+const getCurrencySymbol = (currency) => currencySymbols[currency] || '$'
+const getCurrencyRate = (currency) => exchangeRates[currency] || 1.0
+const convertUsdToCurrency = (amountUSD = 0, currency = 'USD') => {
+  return Number(amountUSD || 0) * getCurrencyRate(currency)
+}
+const convertCurrencyToUsd = (amount = 0, currency = 'USD') => {
+  const rate = getCurrencyRate(currency)
+  return rate === 0 ? 0 : Number(amount || 0) / rate
+}
+const formatAmountForCurrency = (amountUSD = 0, currency = 'USD') => {
+  const value = convertUsdToCurrency(amountUSD, currency)
+  return `${getCurrencySymbol(currency)}${value.toFixed(2)}`
+}
+
 // Users
 const users = ref([])
 const userError = ref('')
@@ -42,6 +70,52 @@ const newTip = ref({ title: '', content: '' })
 const editTipData = ref({ id: null, title: '', content: '' })
 const tipError = ref('')
 
+// User data management (transactions + categories)
+const getDefaultTransactionForm = () => ({
+  id: null,
+  amount: '',
+  category_id: '',
+  note: '',
+  date: '',
+  type: 'expense',
+  userCurrency: 'USD'
+})
+
+const getDefaultCategoryForm = () => ({
+  id: null,
+  name: '',
+  type: 'expense'
+})
+
+const selectedUserForData = ref(null)
+const selectedUserCurrency = ref('USD')
+const selectedUserSymbol = ref('$')
+const dataModalTab = ref('transactions')
+const getTodayDate = () => new Date().toISOString().split('T')[0]
+const getNewTransactionTemplate = () => ({
+  amount: '',
+  category_id: '',
+  note: '',
+  date: getTodayDate(),
+  type: 'expense',
+  userCurrency: selectedUserCurrency.value || 'USD'
+})
+const getNewCategoryTemplate = () => ({
+  name: '',
+  type: 'expense'
+})
+const userTransactions = ref([])
+const userCategories = ref([])
+const userCategoryOptions = ref([])
+const transactionLoading = ref(false)
+const categoryLoading = ref(false)
+const transactionError = ref('')
+const categoryManagementError = ref('')
+const transactionForm = ref(getDefaultTransactionForm())
+const newTransactionForm = ref(getNewTransactionTemplate())
+const categoryForm = ref(getDefaultCategoryForm())
+const newCategoryForm = ref(getNewCategoryTemplate())
+
 // Alert
 const alertMessage = ref('')          // Message text
 const alertVisible = ref(false)
@@ -55,6 +129,328 @@ const showAlert = (message, duration = 3000) => {
     alertVisible.value = false
     alertMessage.value = ''
   }, duration)
+}
+
+const updateSelectedUserCurrency = (currency) => {
+  const normalized = exchangeRates[currency] ? currency : 'USD'
+  selectedUserCurrency.value = normalized
+  selectedUserSymbol.value = getCurrencySymbol(normalized)
+  newTransactionForm.value.userCurrency = normalized
+}
+
+const formatTransactionAmount = (amountUSD) => {
+  return formatAmountForCurrency(amountUSD, selectedUserCurrency.value || 'USD')
+}
+
+const resetTransactionForm = () => {
+  transactionForm.value = {
+    ...getDefaultTransactionForm(),
+    userCurrency: selectedUserCurrency.value || 'USD'
+  }
+}
+
+const resetCategoryForm = () => {
+  categoryForm.value = getDefaultCategoryForm()
+}
+
+const resetNewTransactionForm = () => {
+  newTransactionForm.value = getNewTransactionTemplate()
+}
+
+const resetNewCategoryForm = () => {
+  newCategoryForm.value = getNewCategoryTemplate()
+}
+
+const fetchUserTransactions = async (userId) => {
+  if (!userId) return
+  transactionLoading.value = true
+  transactionError.value = ''
+  try {
+    const res = await authenticatedFetch(`/backend/api/admin-api/user-transactions-get-api.php?user_id=${userId}`)
+    const data = await res.json()
+    if (data.success) userTransactions.value = data.transactions || []
+    else transactionError.value = data.message || 'Failed to load transactions.'
+  } catch (err) {
+    transactionError.value = 'Network error: ' + err.message
+  } finally {
+    transactionLoading.value = false
+  }
+}
+
+const fetchUserCategories = async (userId) => {
+  if (!userId) return
+  categoryLoading.value = true
+  categoryManagementError.value = ''
+  try {
+    const res = await authenticatedFetch(`/backend/api/admin-api/user-categories-get-api.php?user_id=${userId}`)
+    const data = await res.json()
+    if (data.success) {
+      userCategoryOptions.value = data.categories || []
+      userCategories.value = data.user_categories || []
+    } else {
+      categoryManagementError.value = data.message || 'Failed to load categories.'
+    }
+  } catch (err) {
+    categoryManagementError.value = 'Network error: ' + err.message
+  } finally {
+    categoryLoading.value = false
+  }
+}
+
+const openUserDataModal = async (user) => {
+  if (!user) return
+  selectedUserForData.value = user
+  updateSelectedUserCurrency(user.currency)
+  dataModalTab.value = 'transactions'
+  userTransactions.value = []
+  userCategories.value = []
+  userCategoryOptions.value = []
+  transactionError.value = ''
+  categoryManagementError.value = ''
+  resetTransactionForm()
+  resetCategoryForm()
+  resetNewTransactionForm()
+  resetNewCategoryForm()
+  await nextTick()
+  const modalEl = document.getElementById('userDataModal')
+  if (!modalEl) return
+  const modal = new bootstrap.Modal(modalEl)
+  modal.show()
+  fetchUserTransactions(user.user_id)
+  fetchUserCategories(user.user_id)
+}
+
+const startEditingTransaction = (transaction) => {
+  if (!transaction) return
+  const amountUSD = Number(transaction.amount ?? 0)
+  const convertedAmount = convertUsdToCurrency(amountUSD, selectedUserCurrency.value || 'USD')
+  transactionForm.value = {
+    id: transaction.id,
+    amount: convertedAmount ? convertedAmount.toFixed(2) : '',
+    category_id: transaction.category_id,
+    note: transaction.note || '',
+    date: transaction.date ? transaction.date.substring(0, 10) : '',
+    type: transaction.type || 'expense',
+    userCurrency: selectedUserCurrency.value || 'USD'
+  }
+}
+
+const cancelTransactionEdit = () => {
+  resetTransactionForm()
+}
+
+const submitTransactionUpdate = async () => {
+  if (!selectedUserForData.value || !transactionForm.value.id) return
+  transactionError.value = ''
+  const amountValue = Number(transactionForm.value.amount)
+
+  if (!amountValue || Number.isNaN(amountValue)) {
+    transactionError.value = 'Amount is required.'
+    return
+  }
+  const categoryIdNumber = Number(transactionForm.value.category_id)
+  if (!categoryIdNumber) {
+    transactionError.value = 'Category selection is required.'
+    return
+  }
+  if (!transactionForm.value.date) {
+    transactionError.value = 'Date is required.'
+    return
+  }
+
+  try {
+    const amountInUsd = convertCurrencyToUsd(amountValue, selectedUserCurrency.value || 'USD')
+    const requestPayload = {
+      user_id: selectedUserForData.value.user_id,
+      id: transactionForm.value.id,
+      amount: Number(amountInUsd.toFixed(2)),
+      category_id: categoryIdNumber,
+      note: transactionForm.value.note,
+      date: transactionForm.value.date,
+      type: transactionForm.value.type,
+      userCurrency: 'USD'
+    }
+    const res = await authenticatedFetch('/backend/api/admin-api/user-transaction-update-api.php', {
+      method: 'PUT',
+      body: JSON.stringify(requestPayload)
+    })
+    const data = await res.json()
+    if (data.success) {
+      await fetchUserTransactions(selectedUserForData.value.user_id)
+      resetTransactionForm()
+      showAlert('Transaction updated successfully!')
+    } else {
+      transactionError.value = data.message || 'Failed to update transaction.'
+    }
+  } catch (err) {
+    transactionError.value = 'Network error: ' + err.message
+  }
+}
+
+const createTransactionForUser = async () => {
+  if (!selectedUserForData.value) return
+  transactionError.value = ''
+  const amountValue = Number(newTransactionForm.value.amount)
+  if (!amountValue || Number.isNaN(amountValue)) {
+    transactionError.value = 'Amount is required.'
+    return
+  }
+  const categoryIdNumber = Number(newTransactionForm.value.category_id)
+  if (!categoryIdNumber) {
+    transactionError.value = 'Category selection is required.'
+    return
+  }
+  if (!newTransactionForm.value.date) {
+    transactionError.value = 'Date is required.'
+    return
+  }
+
+  try {
+    const amountInUsd = convertCurrencyToUsd(amountValue, selectedUserCurrency.value || 'USD')
+    const res = await authenticatedFetch('/backend/api/admin-api/user-transaction-create-api.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: selectedUserForData.value.user_id,
+        amount: Number(amountInUsd.toFixed(2)),
+        category_id: categoryIdNumber,
+        note: newTransactionForm.value.note,
+        date: newTransactionForm.value.date,
+        type: newTransactionForm.value.type,
+        userCurrency: 'USD'
+      })
+    })
+    const data = await res.json()
+    if (data.success) {
+      await fetchUserTransactions(selectedUserForData.value.user_id)
+      resetNewTransactionForm()
+      showAlert('Transaction added successfully!')
+    } else {
+      transactionError.value = data.message || 'Failed to add transaction.'
+    }
+  } catch (err) {
+    transactionError.value = 'Network error: ' + err.message
+  }
+}
+
+const deleteUserTransaction = async (transaction) => {
+  if (!selectedUserForData.value || !transaction) return
+  if (!confirm('Are you sure you want to delete this transaction?')) return
+  try {
+    const res = await authenticatedFetch('/backend/api/admin-api/user-transaction-delete-api.php', {
+      method: 'DELETE',
+      body: JSON.stringify({
+        user_id: selectedUserForData.value.user_id,
+        id: transaction.id,
+        type: transaction.type
+      })
+    })
+    const data = await res.json()
+    if (data.success) {
+      await fetchUserTransactions(selectedUserForData.value.user_id)
+      if (transactionForm.value.id === transaction.id) resetTransactionForm()
+      showAlert('Transaction deleted successfully!')
+    } else {
+      transactionError.value = data.message || 'Failed to delete transaction.'
+    }
+  } catch (err) {
+    transactionError.value = 'Network error: ' + err.message
+  }
+}
+
+const startEditingCategory = (category) => {
+  if (!category) return
+  categoryForm.value = {
+    id: category.id,
+    name: category.name,
+    type: category.type || 'expense'
+  }
+}
+
+const cancelCategoryEdit = () => {
+  resetCategoryForm()
+}
+
+const submitCategoryUpdate = async () => {
+  if (!selectedUserForData.value || !categoryForm.value.id) return
+  const trimmedName = categoryForm.value.name.trim()
+  if (!trimmedName) {
+    categoryManagementError.value = 'Category name is required.'
+    return
+  }
+  try {
+    const res = await authenticatedFetch('/backend/api/admin-api/user-category-update-api.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: selectedUserForData.value.user_id,
+        id: categoryForm.value.id,
+        name: trimmedName,
+        type: categoryForm.value.type
+      })
+    })
+    const data = await res.json()
+    if (data.success) {
+      await fetchUserCategories(selectedUserForData.value.user_id)
+      resetCategoryForm()
+      showAlert('Category updated successfully!')
+    } else {
+      categoryManagementError.value = data.message || 'Failed to update category.'
+    }
+  } catch (err) {
+    categoryManagementError.value = 'Network error: ' + err.message
+  }
+}
+
+const createCategoryForUser = async () => {
+  if (!selectedUserForData.value) return
+  const trimmedName = newCategoryForm.value.name.trim()
+  if (!trimmedName) {
+    categoryManagementError.value = 'Category name is required.'
+    return
+  }
+  try {
+    const res = await authenticatedFetch('/backend/api/admin-api/user-category-create-api.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: selectedUserForData.value.user_id,
+        name: trimmedName,
+        type: newCategoryForm.value.type
+      })
+    })
+    const data = await res.json()
+    if (data.success) {
+      await fetchUserCategories(selectedUserForData.value.user_id)
+      resetNewCategoryForm()
+      showAlert('Category created successfully!')
+    } else {
+      categoryManagementError.value = data.message || 'Failed to create category.'
+    }
+  } catch (err) {
+    categoryManagementError.value = 'Network error: ' + err.message
+  }
+}
+
+const deleteUserCategory = async (category) => {
+  if (!selectedUserForData.value || !category) return
+  if (!confirm('Are you sure you want to delete this category?')) return
+  try {
+    const res = await authenticatedFetch('/backend/api/admin-api/user-category-delete-api.php', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: selectedUserForData.value.user_id,
+        id: category.id
+      })
+    })
+    const data = await res.json()
+    if (data.success) {
+      await fetchUserCategories(selectedUserForData.value.user_id)
+      if (categoryForm.value.id === category.id) resetCategoryForm()
+      showAlert('Category deleted successfully!')
+    } else {
+      categoryManagementError.value = data.message || 'Failed to delete category.'
+    }
+  } catch (err) {
+    categoryManagementError.value = 'Network error: ' + err.message
+  }
 }
 
 // Fetch users and categories
@@ -101,7 +497,13 @@ const createUser = async () => {
     const data = await res.json()
 
     if (data.success) {
-      users.value.push({ user_id: data.user_id, username: newUser.value.username, email: newUser.value.email, role: newUser.value.role })
+      users.value.push({
+        user_id: data.user_id,
+        username: newUser.value.username,
+        email: newUser.value.email,
+        role: newUser.value.role,
+        currency: 'USD'
+      })
       bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide()
       showAlert(`User ${newUser.value.username} created successfully!`)
     } else {
@@ -385,6 +787,8 @@ const deleteTip = async (id) => {
                         <td v-if="user.role == 'admin'"><span class="badge bg-success">Admin</span></td>
                         <td v-else><span class="badge bg-secondary">User</span></td>
                         <td class="text-end">
+                          <button class="btn btn-sm btn-outline-info me-1"
+                            @click="openUserDataModal(user)">Edit Data</button>
                           <button class="btn btn-sm btn-outline-warning me-1"
                             @click="openEditUserModal(user)">Edit</button>
                           <button class="btn btn-sm btn-outline-danger"
@@ -504,6 +908,247 @@ const deleteTip = async (id) => {
 
         </div>
       </main>
+    </div>
+
+    <!-- User Data Modal -->
+    <div class="modal fade" id="userDataModal" tabindex="-1" aria-labelledby="userDataModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title" id="userDataModalLabel">Manage User Data</h5>
+              <p class="mb-0 text-muted small">{{ selectedUserForData ? selectedUserForData.username : '' }}</p>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div class="btn-group w-100 mb-3">
+              <button type="button" class="btn" :class="dataModalTab === 'transactions' ? 'btn-primary' : 'btn-outline-primary'"
+                @click="dataModalTab = 'transactions'">
+                Transactions
+              </button>
+              <button type="button" class="btn" :class="dataModalTab === 'categories' ? 'btn-primary' : 'btn-outline-primary'"
+                @click="dataModalTab = 'categories'">
+                Categories
+              </button>
+            </div>
+
+            <div v-if="dataModalTab === 'transactions'">
+              <div v-if="transactionLoading" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+              </div>
+              <div v-else>
+                <div class="card border-0 shadow-sm mb-3">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                      <h6 class="mb-0">Add Transaction</h6>
+                      <span class="text-muted small">Amounts shown in {{ selectedUserCurrency }} ({{ selectedUserSymbol }})</span>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-3">
+                        <label class="form-label small text-muted">Amount</label>
+                        <input type="number" min="0" step="0.01" class="form-control" v-model="newTransactionForm.amount"
+                          :placeholder="`Amount in ${selectedUserSymbol}`" />
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label small text-muted">Date</label>
+                        <input type="date" class="form-control" v-model="newTransactionForm.date" />
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label small text-muted">Type</label>
+                        <select class="form-select" v-model="newTransactionForm.type">
+                          <option value="income">Income</option>
+                          <option value="expense">Expense</option>
+                        </select>
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label small text-muted">Category</label>
+                        <select class="form-select" v-model="newTransactionForm.category_id">
+                          <option disabled value="">Select category</option>
+                          <option v-for="category in userCategoryOptions" :key="category.id" :value="category.id">
+                            {{ category.name }} ({{ category.type }})
+                          </option>
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label small text-muted">Note</label>
+                        <textarea class="form-control" rows="2" v-model="newTransactionForm.note" placeholder="Optional note"></textarea>
+                      </div>
+                    </div>
+                    <div class="text-end mt-3">
+                      <button class="btn btn-primary" @click="createTransactionForUser">Add Transaction</button>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="transactionError" class="alert alert-danger">{{ transactionError }}</div>
+                <div v-if="userTransactions.length" class="table-responsive">
+                  <table class="table table-striped align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th>Amount ({{ selectedUserSymbol }} / {{ selectedUserCurrency }})</th>
+                        <th>Note</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="transaction in userTransactions" :key="transaction.id">
+                        <td>{{ transaction.id }}</td>
+                        <td>{{ transaction.date ? new Date(transaction.date).toLocaleDateString() : '—' }}</td>
+                        <td>
+                          <span :class="transaction.type === 'income' ? 'badge bg-success' : 'badge bg-danger'">
+                            {{ transaction.type }}
+                          </span>
+                        </td>
+                        <td>{{ transaction.category_name || '—' }}</td>
+                        <td>{{ formatTransactionAmount(transaction.amount) }}</td>
+                        <td>{{ transaction.note || '—' }}</td>
+                        <td class="text-end">
+                          <button class="btn btn-sm btn-outline-warning me-2" @click="startEditingTransaction(transaction)">Edit</button>
+                          <button class="btn btn-sm btn-outline-danger" @click="deleteUserTransaction(transaction)">Delete</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p v-else class="text-center text-muted py-3">No transactions found for this user.</p>
+
+                <div v-if="transactionForm.id" class="border rounded bg-light p-3 mt-3">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Edit Transaction</h6>
+                    <button class="btn btn-sm btn-link text-decoration-none" @click="cancelTransactionEdit">Cancel</button>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label small text-muted">Amount ({{ selectedUserSymbol }} / {{ selectedUserCurrency }})</label>
+                      <input type="number" min="0" step="0.01" class="form-control" v-model="transactionForm.amount" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small text-muted">Date</label>
+                      <input type="date" class="form-control" v-model="transactionForm.date" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small text-muted">Type</label>
+                      <select class="form-select" v-model="transactionForm.type">
+                        <option value="income">Income</option>
+                        <option value="expense">Expense</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small text-muted">Category</label>
+                      <select class="form-select" v-model="transactionForm.category_id">
+                        <option disabled value="">Select category</option>
+                        <option v-for="category in userCategoryOptions" :key="category.id" :value="category.id">
+                          {{ category.name }} ({{ category.type }})
+                        </option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label small text-muted">Note</label>
+                      <textarea class="form-control" rows="1" v-model="transactionForm.note" placeholder="Optional note"></textarea>
+                    </div>
+                  </div>
+                  <div class="text-end mt-3">
+                    <button class="btn btn-secondary me-2" @click="cancelTransactionEdit">Cancel</button>
+                    <button class="btn btn-primary" @click="submitTransactionUpdate">Save changes</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div v-else>
+              <div v-if="categoryLoading" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+              </div>
+              <div v-else>
+                <div class="card border-0 shadow-sm mb-3">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                      <h6 class="mb-0">Add Category</h6>
+                      <span class="text-muted small">Custom categories only</span>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-8">
+                        <label class="form-label small text-muted">Name</label>
+                        <input type="text" class="form-control" v-model="newCategoryForm.name" placeholder="Category name" />
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label small text-muted">Type</label>
+                        <select class="form-select" v-model="newCategoryForm.type">
+                          <option value="income">Income</option>
+                          <option value="expense">Expense</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="text-end mt-3">
+                      <button class="btn btn-primary" @click="createCategoryForUser">Add Category</button>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="categoryManagementError" class="alert alert-danger">{{ categoryManagementError }}</div>
+                <div v-if="userCategories.length" class="table-responsive">
+                  <table class="table table-striped align-middle">
+                    <thead class="table-light">
+                      <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="category in userCategories" :key="category.id">
+                        <td>{{ category.id }}</td>
+                        <td>{{ category.name }}</td>
+                        <td>
+                          <span :class="category.type === 'income' ? 'badge bg-success' : 'badge bg-danger'">
+                            {{ category.type }}
+                          </span>
+                        </td>
+                        <td class="text-end">
+                          <button class="btn btn-sm btn-outline-warning me-2" @click="startEditingCategory(category)">Edit</button>
+                          <button class="btn btn-sm btn-outline-danger" @click="deleteUserCategory(category)">Delete</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p v-else class="text-center text-muted py-3">This user has not created custom categories yet.</p>
+
+                <div v-if="categoryForm.id" class="border rounded bg-light p-3 mt-3">
+                  <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Edit Category</h6>
+                    <button class="btn btn-sm btn-link text-decoration-none" @click="cancelCategoryEdit">Cancel</button>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-8">
+                      <label class="form-label small text-muted">Name</label>
+                      <input type="text" class="form-control" v-model="categoryForm.name" />
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small text-muted">Type</label>
+                      <select class="form-select" v-model="categoryForm.type">
+                        <option value="income">Income</option>
+                        <option value="expense">Expense</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="text-end mt-3">
+                    <button class="btn btn-secondary me-2" @click="cancelCategoryEdit">Cancel</button>
+                    <button class="btn btn-primary" @click="submitCategoryUpdate">Save changes</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Edit Category Modal -->

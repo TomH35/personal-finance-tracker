@@ -95,6 +95,30 @@ class CustomCategories {
         }
     }
 
+    // Get only the categories created by a specific user
+    public function getUserOwnedCategories($user_id) {
+        try {
+            $pdo = $this->db->getPdo();
+
+            if (empty($user_id)) {
+                return ['success' => false, 'message' => 'User ID is required', 'categories' => []];
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT category_id AS id, name, type, user_id, is_predefined
+                FROM categories
+                WHERE user_id = :user_id
+                ORDER BY name ASC
+            ");
+            $stmt->execute(['user_id' => $user_id]);
+
+            $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return ['success' => true, 'categories' => $categories];
+        } catch (PDOException $e) {
+            return ['success' => false, 'message' => 'Failed to load user categories', 'categories' => []];
+        }
+    }
+
     // Update a custom category
     public function updateCustomCategory($id, $name, $type, $user_id) {
         try {

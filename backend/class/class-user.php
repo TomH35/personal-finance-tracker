@@ -19,7 +19,7 @@ class User
     public function getAllUsers()
     {
         try {
-            $stmt = $this->db->prepare("SELECT user_id, username, email, role, created_at FROM users");
+            $stmt = $this->db->prepare("SELECT user_id, username, email, role, currency, created_at FROM users");
             $stmt->execute();
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
