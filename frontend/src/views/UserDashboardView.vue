@@ -8,15 +8,32 @@
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-body">
               <h6 class="fw-semibold mb-3">Summary</h6>
+              <div class="mb-3">
+                <label class="form-label small text-muted">Time Window</label>
+                <select v-model="summaryTimeWindow" class="form-select form-select-sm mb-2">
+                  <option value="year">Year</option>
+                  <option value="current-month">Current Month</option>
+                  <option value="custom">Custom</option>
+                </select>
+                <div v-if="summaryTimeWindow === 'custom'">
+                  <label class="form-label small text-muted">Start Date</label>
+                  <input v-model="summaryCustomStartDate" type="date" class="form-control form-control-sm mb-2" />
+                  <label class="form-label small text-muted">End Date</label>
+                  <input v-model="summaryCustomEndDate" type="date" class="form-control form-control-sm mb-2" />
+                </div>
+                <button @click="updateSummary" class="btn btn-primary btn-sm w-100">
+                  <i class="bi bi-arrow-clockwise me-1"></i>Update Summary
+                </button>
+              </div>
               <ul class="list-group list-group-flush">
                 <li class="list-group-item d-flex justify-content-between">
-                  Income <span class="badge bg-success">{{ currencySymbol }}{{ totalIncome.toFixed(2) }}</span>
+                  Income <span class="badge bg-success">{{ currencySymbol }}{{ summaryIncome.toFixed(2) }}</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
-                  Expenses <span class="badge bg-danger">{{ currencySymbol }}{{ totalExpenses.toFixed(2) }}</span>
+                  Expenses <span class="badge bg-danger">{{ currencySymbol }}{{ summaryExpenses.toFixed(2) }}</span>
                 </li>
                 <li class="list-group-item d-flex justify-content-between">
-                  Balance <span class="badge" :class="balance >= 0 ? 'bg-primary' : 'bg-warning'">{{ currencySymbol }}{{ balance.toFixed(2) }}</span>
+                  Balance <span class="badge" :class="summaryBalance >= 0 ? 'bg-primary' : 'bg-warning'">{{ currencySymbol }}{{ summaryBalance.toFixed(2) }}</span>
                 </li>
               </ul>
             </div>
@@ -531,7 +548,7 @@
 <script>
 import { useLoginStore } from '@/stores/loginStore'
 import { useNotificationStore } from '@/stores/notificationStore'
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authenticatedFetch } from '@/utils/api'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
@@ -602,6 +619,57 @@ export default {
     
     const currencySymbol = computed(() => {
       return currencySymbols[userCurrency.value] || '$'
+    })
+
+    // Summary time window
+    const summaryTimeWindow = ref('current-month')
+    const summaryStartDate = ref('')
+    const summaryEndDate = ref('')
+    const summaryCustomStartDate = ref('')
+    const summaryCustomEndDate = ref('')
+    
+    // Initialize custom dates with current month
+    const initializeCustomDates = () => {
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const lastDay = new Date(year, now.getMonth() + 1, 0).getDate()
+      summaryCustomStartDate.value = `${year}-${month}-01`
+      summaryCustomEndDate.value = `${year}-${month}-${lastDay}`
+    }
+    
+    // Update summary based on selected time window
+    function updateSummary() {
+      const now = new Date()
+      
+      if (summaryTimeWindow.value === 'year') {
+        summaryStartDate.value = `${now.getFullYear()}-01-01`
+        summaryEndDate.value = `${now.getFullYear()}-12-31`
+      } else if (summaryTimeWindow.value === 'current-month') {
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0')
+        const lastDay = new Date(year, now.getMonth() + 1, 0).getDate()
+        summaryStartDate.value = `${year}-${month}-01`
+        summaryEndDate.value = `${year}-${month}-${lastDay}`
+      } else if (summaryTimeWindow.value === 'custom') {
+        if (summaryCustomStartDate.value && summaryCustomEndDate.value) {
+          summaryStartDate.value = summaryCustomStartDate.value
+          summaryEndDate.value = summaryCustomEndDate.value
+        }
+      }
+    }
+    
+    // Initialize on mount
+    watch(summaryTimeWindow, (newValue) => {
+      if (newValue === 'custom' && !summaryCustomStartDate.value) {
+        initializeCustomDates()
+      }
+    })
+    
+    // Set initial dates for current month
+    onMounted(() => {
+      updateSummary()
+      initializeCustomDates()
     })
 
     // Chart type selector
@@ -1059,18 +1127,43 @@ export default {
       return categories.value.filter(cat => cat.type === editFormData.value.type)
     })
     
-    const totalIncome = computed(() => {
-      const sum = incomeList.value.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+    // Summary calculations based on time window
+    const summaryIncome = computed(() => {
+      if (!summaryStartDate.value || !summaryEndDate.value) return 0
+      
+      const start = new Date(summaryStartDate.value)
+      const end = new Date(summaryEndDate.value)
+      end.setHours(23, 59, 59, 999)
+      
+      const sum = incomeList.value
+        .filter(item => {
+          const itemDate = parseDate(item.date)
+          return itemDate && itemDate >= start && itemDate <= end
+        })
+        .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      
       return convertCurrency(sum)
     })
-
-    const totalExpenses = computed(() => {
-      const sum = expenseList.value.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+    
+    const summaryExpenses = computed(() => {
+      if (!summaryStartDate.value || !summaryEndDate.value) return 0
+      
+      const start = new Date(summaryStartDate.value)
+      const end = new Date(summaryEndDate.value)
+      end.setHours(23, 59, 59, 999)
+      
+      const sum = expenseList.value
+        .filter(item => {
+          const itemDate = parseDate(item.date)
+          return itemDate && itemDate >= start && itemDate <= end
+        })
+        .reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
+      
       return convertCurrency(sum)
     })
-
-    const balance = computed(() => {
-      return totalIncome.value - totalExpenses.value
+    
+    const summaryBalance = computed(() => {
+      return summaryIncome.value - summaryExpenses.value
     })
 
     // Calculate current month expenses in USD for limit checking
@@ -1632,9 +1725,15 @@ export default {
       filteredCategories,
       editFilteredCategories,
       filteredAndSortedTransactions,
-      totalIncome,
-      totalExpenses,
-      balance,
+      summaryTimeWindow,
+      summaryStartDate,
+      summaryEndDate,
+      summaryCustomStartDate,
+      summaryCustomEndDate,
+      updateSummary,
+      summaryIncome,
+      summaryExpenses,
+      summaryBalance,
       limits,
       warningLimit,
       criticalLimit,
