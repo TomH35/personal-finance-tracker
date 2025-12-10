@@ -42,9 +42,33 @@
               v-model="formData.password"
               type="password"
               class="form-control"
+              :class="{ 'is-invalid': formData.password && !passwordRequirementsMet }"
               placeholder="Enter your password"
               required
             />
+          </div>
+          <!-- Password Requirements -->
+          <div v-if="formData.password" class="small mt-2">
+            <div :class="passwordRequirements.length ? 'text-success' : 'text-danger'">
+              <i :class="passwordRequirements.length ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+              At least 8 characters
+            </div>
+            <div :class="passwordRequirements.uppercase ? 'text-success' : 'text-danger'">
+              <i :class="passwordRequirements.uppercase ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+              At least one uppercase letter (A-Z)
+            </div>
+            <div :class="passwordRequirements.lowercase ? 'text-success' : 'text-danger'">
+              <i :class="passwordRequirements.lowercase ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+              At least one lowercase letter (a-z)
+            </div>
+            <div :class="passwordRequirements.number ? 'text-success' : 'text-danger'">
+              <i :class="passwordRequirements.number ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+              At least one number (0-9)
+            </div>
+            <div :class="passwordRequirements.special ? 'text-success' : 'text-danger'">
+              <i :class="passwordRequirements.special ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
+              At least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)
+            </div>
           </div>
         </div>
 
@@ -137,8 +161,29 @@ const passwordMismatch = computed(() => {
   )
 })
 
+// Password requirements validation
+const passwordRequirements = computed(() => {
+  const password = formData.value.password
+  return {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)
+  }
+})
+
+const passwordRequirementsMet = computed(() => {
+  const reqs = passwordRequirements.value
+  return reqs.length && reqs.uppercase && reqs.lowercase && reqs.number && reqs.special
+})
+
 const handleSubmit = () => {
   if (passwordMismatch.value) {
+    return
+  }
+
+  if (!passwordRequirementsMet.value) {
     return
   }
 
