@@ -50,6 +50,35 @@
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
           <h3 class="fw-semibold mb-4">Dashboard</h3>
 
+          <!-- Financial Tips Carousel -->
+          <div v-if="tips.length > 0" class="card shadow-sm border-0 mb-4" style="background: #2d3436;">
+            <div class="card-body text-white">
+              <div id="tipsCarousel" class="carousel slide" data-bs-ride="carousel">
+                <div class="carousel-inner">
+                  <div 
+                    v-for="(tip, index) in tips" 
+                    :key="tip.id" 
+                    class="carousel-item"
+                    :class="{ active: index === 0 }"
+                  >
+                    <div class="text-center py-3 px-5">
+                      <h5 class="fw-bold mb-3">💡 {{ tip.title }}</h5>
+                      <p class="mb-0 mx-auto" style="max-width: 700px;">{{ tip.content }}</p>
+                    </div>
+                  </div>
+                </div>
+                <button class="carousel-control-prev" type="button" data-bs-target="#tipsCarousel" data-bs-slide="prev">
+                  <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                  <span class="visually-hidden">Previous</span>
+                </button>
+                <button class="carousel-control-next" type="button" data-bs-target="#tipsCarousel" data-bs-slide="next">
+                  <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                  <span class="visually-hidden">Next</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <!-- Financial Overview Chart -->
           <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
@@ -538,6 +567,7 @@ export default {
     const expenseList = ref([])
     const allTransactions = ref([])
     const categories = ref([])
+    const tips = ref([])
     const loading = ref(false)
     const successMessage = ref('')
     const errorMessage = ref('')
@@ -1159,6 +1189,18 @@ export default {
       }
     }
 
+    async function loadTips() {
+      try {
+        const response = await authenticatedFetch('/backend/api/tips-api/tip-get-all-api.php')
+        const data = await response.json()
+        if (data.success) {
+          tips.value = data.tips || []
+        }
+      } catch (err) {
+        console.error('Failed to load tips:', err)
+      }
+    }
+
     async function loadLimits() {
       try {
         const response = await authenticatedFetch('/backend/api/limit-api/get-limit-api.php')
@@ -1561,6 +1603,7 @@ export default {
 
       await loadUserProfile()
       await loadCategories()
+      await loadTips()
       await loadAllTransactions()
       await loadLimits()
     })
@@ -1570,6 +1613,7 @@ export default {
       expenseList,
       allTransactions,
       categories,
+      tips,
       loading,
       successMessage,
       errorMessage,

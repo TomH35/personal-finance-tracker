@@ -36,6 +36,12 @@ const newCategoryType = ref('expense')
 const selectedCategory = ref({ name: '', type: 'expense' })
 const categoryError = ref('')
 
+// Tips
+const tips = ref([])
+const newTip = ref({ title: '', content: '' })
+const editTipData = ref({ id: null, title: '', content: '' })
+const tipError = ref('')
+
 // Alert
 const alertMessage = ref('')          // Message text
 const alertVisible = ref(false)
@@ -63,6 +69,7 @@ onMounted(async () => {
   }
 
   getCategories()
+  getTips()
 })
 
 // OPEN "ADD USER" modal
@@ -246,6 +253,86 @@ const deleteCategory = async (id) => {
     alert('Network error: ' + err.message)
   }
 }
+
+// Tips actions
+const getTips = async () => {
+  try {
+    const res = await authenticatedFetch('/backend/api/tips-api/tip-get-all-api.php')
+    const data = await res.json()
+    if (data.success) tips.value = data.tips
+    else tipError.value = data.message
+  } catch (err) {
+    tipError.value = 'Network error: ' + err.message
+  }
+}
+
+const createTip = async () => {
+  if (!newTip.value.title || !newTip.value.content) {
+    alert('Title and content are required')
+    return
+  }
+
+  try {
+    const res = await authenticatedFetch('/backend/api/tips-api/tip-create-api.php', {
+      method: 'POST',
+      body: JSON.stringify(newTip.value)
+    })
+    const data = await res.json()
+    if (data.success) {
+      tips.value.unshift(data.tip)
+      newTip.value = { title: '', content: '' }
+      showAlert('Tip created successfully!')
+    } else alert(data.message)
+  } catch (err) {
+    alert('Network error: ' + err.message)
+  }
+}
+
+const openEditTipModal = async (tip) => {
+  editTipData.value = { ...tip }
+  await nextTick()
+  new bootstrap.Modal(document.getElementById('editTipModal')).show()
+}
+
+const updateTip = async () => {
+  if (!editTipData.value.title || !editTipData.value.content) {
+    alert('Title and content are required')
+    return
+  }
+
+  try {
+    const res = await authenticatedFetch('/backend/api/tips-api/tip-edit-api.php', {
+      method: 'PUT',
+      body: JSON.stringify(editTipData.value)
+    })
+    const data = await res.json()
+    if (data.success) {
+      const index = tips.value.findIndex(t => t.id === editTipData.value.id)
+      if (index !== -1) tips.value[index] = { ...editTipData.value }
+      bootstrap.Modal.getInstance(document.getElementById('editTipModal')).hide()
+      showAlert('Tip updated successfully!')
+    } else alert(data.message)
+  } catch (err) {
+    alert('Network error: ' + err.message)
+  }
+}
+
+const deleteTip = async (id) => {
+  if (!confirm('Are you sure you want to delete this tip?')) return
+  try {
+    const res = await authenticatedFetch('/backend/api/tips-api/tip-delete-api.php', {
+      method: 'DELETE',
+      body: JSON.stringify({ id })
+    })
+    const data = await res.json()
+    if (data.success) {
+      tips.value = tips.value.filter(t => t.id !== id)
+      showAlert('Tip deleted successfully!')
+    } else alert(data.message)
+  } catch (err) {
+    alert('Network error: ' + err.message)
+  }
+}
 </script>
 
 <template>
@@ -260,6 +347,8 @@ const deleteCategory = async (id) => {
             type="button" role="tab">👥 Users</button>
           <button class="nav-link mb-2 text-start" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories"
             type="button" role="tab">🗂️ Categories</button>
+          <button class="nav-link mb-2 text-start" id="tips-tab" data-bs-toggle="tab" data-bs-target="#tips"
+            type="button" role="tab">💡 Tips</button>
         </div>
       </nav>
 
@@ -353,6 +442,61 @@ const deleteCategory = async (id) => {
                     </tbody>
                   </table>
                   <p v-if="categoryError" class="text-danger mt-2">{{ categoryError }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TIPS -->
+          <div class="tab-pane fade" id="tips" role="tabpanel">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <h5 class="card-title mb-3">Financial Tips</h5>
+                
+                <!-- Add New Tip Section -->
+                <div class="card mb-3 bg-light">
+                  <div class="card-body">
+                    <h6 class="card-subtitle mb-3">Add New Tip</h6>
+                    <div class="mb-2">
+                      <input v-model="newTip.title" type="text" class="form-control" placeholder="Tip title" maxlength="255">
+                    </div>
+                    <div class="mb-2">
+                      <textarea v-model="newTip.content" class="form-control" placeholder="Tip content" rows="3"></textarea>
+                    </div>
+                    <button class="btn btn-primary btn-sm" @click="createTip">Add Tip</button>
+                  </div>
+                </div>
+
+                <div class="table-responsive">
+                  <table class="table align-middle table-hover">
+                    <thead class="table-primary">
+                      <tr>
+                        <th>#</th>
+                        <th>Title</th>
+                        <th>Content</th>
+                        <th>Created</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="tip in tips" :key="tip.id">
+                        <td>{{ tip.id }}</td>
+                        <td>{{ tip.title }}</td>
+                        <td>{{ tip.content.substring(0, 50) }}{{ tip.content.length > 50 ? '...' : '' }}</td>
+                        <td>{{ new Date(tip.created_at).toLocaleDateString() }}</td>
+                        <td class="text-end">
+                          <button class="btn btn-sm btn-outline-warning me-1"
+                            @click="openEditTipModal(tip)">Edit</button>
+                          <button class="btn btn-sm btn-outline-danger"
+                            @click="deleteTip(tip.id)">Delete</button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <p v-if="tipError" class="text-danger mt-2">{{ tipError }}</p>
+                </div>
+                <div v-if="alertVisible" class="alert alert-success" role="alert">
+                  {{ alertMessage }}
                 </div>
               </div>
             </div>
@@ -457,6 +601,26 @@ const deleteCategory = async (id) => {
           <div class="modal-footer">
             <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             <button class="btn btn-primary" @click="updateUser">Save changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Tip Modal -->
+    <div class="modal fade" id="editTipModal" tabindex="-1">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Edit Tip</h5>
+            <button class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <input v-model="editTipData.title" class="form-control mb-2" placeholder="Tip title" maxlength="255" />
+            <textarea v-model="editTipData.content" class="form-control" placeholder="Tip content" rows="5"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" @click="updateTip">Save changes</button>
           </div>
         </div>
       </div>
