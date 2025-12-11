@@ -156,7 +156,8 @@
                 <Doughnut v-else-if="selectedChartType === 'income-breakdown'" :data="incomeBreakdownData" :options="doughnutChartOptions" />
                 <Line v-else-if="selectedChartType === 'balance-trend'" :data="balanceTrendData" :options="lineChartOptions" />
               </div>
-              <div class="btn-group btn-group-sm" role="group" aria-label="Period selector">
+              <div class="d-flex align-items-center">
+                <div class="btn-group btn-group-sm" role="group" aria-label="Period selector">
                   <button 
                     type="button" 
                     class="btn btn-outline-secondary" 
@@ -186,6 +187,13 @@
                     title="All-Time Data"
                   >All-Time</button>
                 </div>
+                <button
+                  type="button" 
+                  class="btn btn-primary ms-auto" 
+                  @click="generatePDF"
+                  title="Save the chart as PDF"
+                  >Save as PDF</button>
+              </div>
             </div>
           </div>
 
@@ -607,6 +615,7 @@ import {
   LineElement,
   Filler
 } from 'chart.js'
+import { jsPDF } from "jspdf";
 
 ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, ArcElement, PointElement, LineElement, Filler)
 
@@ -1200,6 +1209,23 @@ export default {
     const filterMaxAmount = ref('')
     const sortBy = ref('date-desc')
 
+    const generatePDF = () => {
+      const canvas = document.querySelector('canvas');
+
+      if (!canvas) return;
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "px",
+        format: [canvas.width + 16, canvas.height + 16 + 20],
+      });
+
+      pdf.text(`Financial Overview - ${selectedPeriod.value}`, 16, 20);
+      pdf.addImage(imgData, "PNG", 16, 16 + 20, canvas.width, canvas.height);
+      pdf.save('chart.pdf');
+    }
     
     const incomeCategories = computed(() => {
       return categories.value.filter(cat => cat.type === 'income')
@@ -1851,6 +1877,7 @@ export default {
       filterMinAmount,
       filterMaxAmount,
       sortBy,
+      generatePDF,
       incomeCategories,
       filteredCategories,
       editFilteredCategories,
