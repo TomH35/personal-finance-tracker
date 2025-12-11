@@ -1,13 +1,14 @@
 <template>
-  <div class="bg-light min-vh-100">
-    <div class="container-fluid">
-      <div class="row">
+  <div class="min-vh-100" style="background-color: #f8f9fa;">
+    <div class="container-fluid p-0">
+      <div class="row g-0">
         <!-- Sidebar -->
-        <nav class="col-md-3 col-lg-2 d-md-block bg-white border-end min-vh-100 p-3">
-          <h5 class="text-primary mb-4">Account Overview</h5>
-          <div class="card border-0 shadow-sm mb-4">
-            <div class="card-body">
-              <h6 class="fw-semibold mb-3">Summary</h6>
+        <nav class="col-md-4 col-lg-3 d-md-block bg-white border-end min-vh-100 p-0">
+          <div class="p-4">
+          <h5 class="fw-bold mb-4" style="color: #1D2A5B;">Overview</h5>
+          <div class="card border shadow-sm mb-4">
+            <div class="card-body p-4">
+              <h6 class="fw-semibold mb-3 text-uppercase small text-muted">Summary</h6>
               <div class="mb-3">
                 <label class="form-label small text-muted">Time Window</label>
                 <select v-model="summaryTimeWindow" class="form-select form-select-sm mb-2">
@@ -21,86 +22,166 @@
                   <label class="form-label small text-muted">End Date</label>
                   <input v-model="summaryCustomEndDate" type="date" class="form-control form-control-sm mb-2" />
                 </div>
-                <button @click="updateSummary" class="btn btn-primary btn-sm w-100">
+                <button @click="updateSummary" class="btn btn-sm w-100" style="background-color: #1D2A5B; color: white; border: none;">
                   <i class="bi bi-arrow-clockwise me-1"></i>Update Summary
                 </button>
               </div>
-              <ul class="list-group list-group-flush">
-                <li class="list-group-item d-flex justify-content-between">
-                  Income <span class="badge bg-success">{{ currencySymbol }}{{ summaryIncome.toFixed(2) }}</span>
+              <ul class="list-unstyled mb-0">
+                <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                  <span class="text-secondary">Income</span>
+                  <span class="fw-bold text-success">{{ currencySymbol }}{{ summaryIncome.toFixed(2) }}</span>
                 </li>
-                <li class="list-group-item d-flex justify-content-between">
-                  Expenses <span class="badge bg-danger">{{ currencySymbol }}{{ summaryExpenses.toFixed(2) }}</span>
+                <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                  <span class="text-secondary">Expenses</span>
+                  <span class="fw-bold text-danger">{{ currencySymbol }}{{ summaryExpenses.toFixed(2) }}</span>
                 </li>
-                <li class="list-group-item d-flex justify-content-between">
-                  Balance <span class="badge" :class="summaryBalance >= 0 ? 'bg-primary' : 'bg-warning'">{{ currencySymbol }}{{ summaryBalance.toFixed(2) }}</span>
+                <li class="d-flex justify-content-between align-items-center py-2">
+                  <span class="text-secondary">Balance</span>
+                  <span class="fw-bold" :style="{ color: summaryBalance >= 0 ? '#1D2A5B' : '#ffc107' }">{{ currencySymbol }}{{ summaryBalance.toFixed(2) }}</span>
                 </li>
               </ul>
             </div>
           </div>
 
-          <div class="card border-0 shadow-sm">
-            <div class="card-body">
-              <h6 class="fw-semibold mb-3">Categories</h6>
-              <ul class="list-group list-group-flush mb-3">
-                <li 
+          <div class="card border shadow-sm">
+            <div class="card-body p-4">
+              <h6 class="fw-semibold mb-3 text-uppercase small text-muted">Categories</h6>
+              <div class="mb-3" style="max-height: 400px; overflow-y: auto;">
+                <div 
                   v-for="cat in categories" 
                   :key="cat.id" 
-                  class="list-group-item small d-flex justify-content-between align-items-center"
+                  class="mb-2 p-3 rounded d-flex justify-content-between align-items-start" 
+                  style="background-color: #f8f9fa; border-left: 3px solid #1D2A5B;"
                 >
-                  <div>
-                    <span>{{ cat.name }}</span>
-                    <span class="badge ms-2" :class="cat.type === 'income' ? 'bg-success' : 'bg-danger'">{{ cat.type }}</span>
+                  <div class="d-flex flex-column">
+                    <span class="fw-medium text-dark mb-2">{{ cat.name }}</span>
+                    <div v-if="!cat.is_predefined" class="d-flex gap-2">
+                      <button 
+                        class="btn btn-sm d-flex align-items-center gap-1 px-2 py-1" 
+                        style="border: 1px solid #1D2A5B; color: #1D2A5B; background: white; font-size: 0.75rem;" 
+                        @click="openEditCategoryModal(cat)"
+                        title="Edit category"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                        </svg>
+                        <span>Edit</span>
+                      </button>
+                      <button 
+                        class="btn btn-sm btn-danger d-flex align-items-center gap-1 px-2 py-1" 
+                        style="font-size: 0.75rem;" 
+                        @click="openDeleteCategoryModal(cat)"
+                        title="Delete category"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                          <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+                          <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+                        </svg>
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                    <div v-else class="text-muted small fst-italic">
+                      Default category
+                    </div>
                   </div>
-                  <div v-if="!cat.is_predefined">
-                    <button class="btn btn-sm btn-outline-primary me-1" @click="openEditCategoryModal(cat)">Edit</button>
-                    <button class="btn btn-sm btn-outline-danger" @click="openDeleteCategoryModal(cat)">Delete</button>
-                  </div>
-                </li>
-              </ul>
-              <button class="btn btn-primary btn-sm w-100" @click="openCreateCategoryModal">Create Category</button>
+                  <span class="badge" :class="cat.type === 'income' ? 'bg-success' : 'bg-danger'" style="font-size: 0.7rem;">
+                    {{ cat.type }}
+                  </span>
+                </div>
+              </div>
+              <button class="btn btn-sm w-100" style="background-color: #1D2A5B; color: white; border: none;" @click="openCreateCategoryModal">
+                <i class="bi bi-plus-circle me-1"></i>New Category
+              </button>
             </div>
+          </div>
           </div>
         </nav>
 
         <!-- Main Content -->
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-          <h3 class="fw-semibold mb-4">Dashboard</h3>
+        <main class="col-md-8 ms-sm-auto col-lg-9 p-4">
+          <div class="mb-4">
+            <h2 class="fw-bold text-dark mb-1">Dashboard</h2>
+            <p class="text-muted mb-0">Manage your finances and track your spending</p>
+          </div>
 
-          <!-- Financial Tips Carousel -->
-          <div v-if="tips.length > 0" class="card shadow-sm border-0 mb-4" style="background: #2d3436;">
-            <div class="card-body text-white">
-              <div id="tipsCarousel" class="carousel slide" data-bs-ride="carousel">
-                <div class="carousel-inner">
-                  <div 
-                    v-for="(tip, index) in tips" 
-                    :key="tip.id" 
-                    class="carousel-item"
-                    :class="{ active: index === 0 }"
+          <!-- Financial Tips Spotlight -->
+          <div v-if="tips.length" class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h5 class="fw-bold mb-1" style="color: #1D2A5B;">Financial Tips</h5>
+              </div>
+              <div class="d-flex align-items-center gap-3">
+                <span class="badge bg-light text-dark">{{ tips.length }} tips</span>
+                <div class="d-flex gap-2">
+                  <button 
+                    @click="prevTip" 
+                    class="btn btn-sm btn-outline-secondary rounded-circle"
+                    style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;"
+                    :disabled="tips.length <= 2"
                   >
-                    <div class="text-center py-3 px-5">
-                      <h5 class="fw-bold mb-3">💡 {{ tip.title }}</h5>
-                      <p class="mb-0 mx-auto" style="max-width: 700px;">{{ tip.content }}</p>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+                    </svg>
+                  </button>
+                  <button 
+                    @click="nextTip" 
+                    class="btn btn-sm btn-outline-secondary rounded-circle"
+                    style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center;"
+                    :disabled="tips.length <= 2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div style="overflow: hidden; position: relative;">
+              <div 
+                style="display: flex; transition: transform 0.5s ease-in-out;"
+                :style="{ transform: `translateX(-${currentTipIndex * (tips.length === 1 ? 100 : 50)}%)` }"
+              >
+                <div 
+                  v-for="(tip, index) in tips" 
+                  :key="tip.id"
+                  :style="{ minWidth: tips.length === 1 ? '100%' : '50%', padding: '0 0.5rem' }"
+                >
+                  <div class="card border-0 shadow-sm text-white" :style="tipCardStyle(index)" style="height: 180px;">
+                    <div class="card-body d-flex flex-column p-3">
+                      <div class="d-flex justify-content-between align-items-center mb-2 opacity-75 small">
+                        <span>Tip {{ index + 1 }}</span>
+                        <i class="bi bi-lightning-charge-fill"></i>
+                      </div>
+                      <h6 class="fw-bold mb-2">{{ tip.title }}</h6>
+                      <p class="flex-grow-1 mb-2 small" style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">{{ tip.content }}</p>
+                      <div class="d-flex justify-content-between align-items-center small opacity-75">
+                        <span style="font-size: 0.75rem;">{{ tip.created_at ? new Date(tip.created_at).toLocaleDateString() : 'Just added' }}</span>
+                        <span class="fw-semibold" style="font-size: 0.75rem;">Stay inspired</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <button class="carousel-control-prev" type="button" data-bs-target="#tipsCarousel" data-bs-slide="prev">
-                  <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                  <span class="visually-hidden">Previous</span>
-                </button>
-                <button class="carousel-control-next" type="button" data-bs-target="#tipsCarousel" data-bs-slide="next">
-                  <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                  <span class="visually-hidden">Next</span>
-                </button>
+              </div>
+            </div>
+            <div class="text-center mt-3" v-if="tips.length > 2">
+              <div class="d-inline-flex gap-2">
+                <button 
+                  v-for="i in Math.ceil(tips.length / 2)" 
+                  :key="i"
+                  @click="currentTipIndex = (i - 1) * 2"
+                  class="btn btn-sm rounded-circle"
+                  :class="currentTipIndex >= (i - 1) * 2 && currentTipIndex < i * 2 ? 'btn-primary' : 'btn-outline-secondary'"
+                  style="width: 10px; height: 10px; padding: 0; border-width: 2px;"
+                ></button>
               </div>
             </div>
           </div>
 
           <!-- Financial Overview Chart -->
-          <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-semibold mb-0">Financial Overview</h6>
+          <div class="card border shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold mb-0" style="color: #1D2A5B;">Financial Overview</h5>
                 <select v-model="selectedChartType" class="form-select form-select-sm" style="width: auto;">
                   <option value="monthly-comparison">Monthly Income vs Expenses</option>
                   <option value="expense-breakdown">Expense Breakdown by Category</option>
@@ -200,9 +281,9 @@
           </div>
 
           <!-- Add Transaction -->
-          <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body">
-              <h6 class="fw-semibold mb-3">Add Transaction</h6>
+          <div class="card border shadow-sm mb-4">
+            <div class="card-body p-4">
+              <h5 class="fw-bold mb-4" style="color: #1D2A5B;">Add Transaction</h5>
               <form @submit.prevent="addTransaction()">
                 <div class="row g-2">
                   <div class="col-md-2">
@@ -246,7 +327,7 @@
                     />
                   </div>
                   <div class="col-12 mt-3">
-                    <button class="btn btn-primary" :disabled="loading">
+                    <button class="btn" style="background-color: #1D2A5B; color: white; border: none;" :disabled="loading">
                       <span v-if="loading">Adding...</span>
                       <span v-else>Add Transaction</span>
                     </button>
@@ -256,10 +337,10 @@
             </div>
           </div>
 
-          <div class="card shadow-sm border-0 mb-4">
-            <div class="card-body">
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-semibold mb-0">Recent Transactions</h6>
+          <div class="card border shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="fw-bold mb-0" style="color: #1D2A5B;">Recent Transactions</h5>
                 <button class="btn btn-sm btn-outline-primary" @click="loadAllTransactions">
                   <i class="bi bi-arrow-clockwise"></i> Refresh
                 </button>
@@ -315,15 +396,15 @@
                 No transactions match your filters. Try adjusting the filters above.
               </div>
               <div v-else class="table-responsive">
-                <table class="table table-hover align-middle">
-                  <thead class="table-primary">
-                    <tr>
-                      <th>Type</th>
-                      <th>Date</th>
-                      <th>Category</th>
-                      <th>Note</th>
-                      <th class="text-end">Amount</th>
-                      <th class="text-end">Actions</th>
+                <table class="table table-hover align-middle mb-0">
+                  <thead>
+                    <tr class="border-bottom">
+                      <th class="text-muted fw-semibold small text-uppercase">Type</th>
+                      <th class="text-muted fw-semibold small text-uppercase">Date</th>
+                      <th class="text-muted fw-semibold small text-uppercase">Category</th>
+                      <th class="text-muted fw-semibold small text-uppercase">Note</th>
+                      <th class="text-end text-muted fw-semibold small text-uppercase">Amount</th>
+                      <th class="text-end text-muted fw-semibold small text-uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -718,10 +799,38 @@ export default {
     const selectedChartType = ref('monthly-comparison')
 
     // Period selector: week | month | year | all-time
-    const selectedPeriod = ref('month') // default 'month'
+    const selectedPeriod = ref('year') // default 'year'
 
     // Category filter for expense breakdown chart
     const selectedExpenseCategories = ref([])
+    const currentTipIndex = ref(0)
+    
+    const tipGradientPalette = [
+      'linear-gradient(135deg, #1D2A5B, #3D64A8)',
+      'linear-gradient(135deg, #1E9E63, #4CD4A8)',
+      'linear-gradient(135deg, #B85CFF, #6F3CD7)',
+      'linear-gradient(135deg, #FF6A3A, #FF4F81)',
+      'linear-gradient(135deg, #FFB347, #FFCC33)'
+    ]
+    
+    const prevTip = () => {
+      if (currentTipIndex.value > 0) {
+        currentTipIndex.value -= 2
+      } else {
+        // Loop to end
+        const maxIndex = Math.max(0, tips.value.length - 2)
+        currentTipIndex.value = Math.floor(maxIndex / 2) * 2
+      }
+    }
+    
+    const nextTip = () => {
+      if (currentTipIndex.value + 2 < tips.value.length) {
+        currentTipIndex.value += 2
+      } else {
+        // Loop to start
+        currentTipIndex.value = 0
+      }
+    }
     
     // Get unique expense category names from transactions
     const expenseCategoryOptions = computed(() => {
@@ -759,6 +868,11 @@ export default {
     function deselectAllExpenseCategories() {
       selectedExpenseCategories.value = []
     }
+
+    const tipCardStyle = (index) => ({
+      background: tipGradientPalette[index % tipGradientPalette.length],
+      color: '#fff'
+    })
 
     // Returns a local date key in the form "YYYY-MM-DD"
     function dateKey(d) {
@@ -1903,7 +2017,11 @@ export default {
       openEditCategoryModal,
       updateCategory,
       openDeleteCategoryModal,
-      confirmDeleteCategory
+      confirmDeleteCategory,
+      currentTipIndex,
+      prevTip,
+      nextTip,
+      tipCardStyle
     }
   }
 }
