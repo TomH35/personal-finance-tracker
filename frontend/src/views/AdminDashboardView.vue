@@ -484,12 +484,18 @@ const createUser = async () => {
   }
 
   try {
-    const apiUrl = '/backend/api/auth-api/user-registration-api.php'
-    const payload = { ...newUser.value, is_admin_creation: true } // Flag for admin
+    // Validate password requirements
+    const apiUrl = newUser.value.role === 'admin'
+      ? '/backend/api/auth-api/admin-registration-api.php'
+      : '/backend/api/auth-api/user-registration-api.php'
 
     const res = await authenticatedFetch(apiUrl, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(newUser.value),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(newUser.value.role !== 'user' ? { 'Authorization': `Bearer ${loginStore.jwt}` } : {})
+      }
     })
 
     const data = await res.json()
@@ -512,7 +518,6 @@ const createUser = async () => {
     alert('Error: ' + err.message)
   }
 }
-
 
 // OPEN EDIT USER MODAL
 const openEditUserModal = async (user) => {
