@@ -91,6 +91,48 @@
                   <option value="balance-trend">Balance Trend Over Time</option>
                 </select>
               </div>
+              
+              <!-- Category Filter for Expense Breakdown -->
+              <div v-if="selectedChartType === 'expense-breakdown'" class="mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <label class="form-label small text-muted mb-0">Filter by Categories:</label>
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button 
+                      type="button"
+                      class="btn"
+                      :class="selectedExpenseCategories.length === expenseCategoryOptions.length ? 'btn-success' : 'btn-outline-success'"
+                      @click="selectAllExpenseCategories"
+                      :disabled="selectedExpenseCategories.length === expenseCategoryOptions.length"
+                    >
+                      <i class="bi bi-check-all me-1"></i>Select All
+                    </button>
+                    <button 
+                      type="button"
+                      class="btn"
+                      :class="selectedExpenseCategories.length === 0 ? 'btn-danger' : 'btn-outline-danger'"
+                      @click="deselectAllExpenseCategories"
+                      :disabled="selectedExpenseCategories.length === 0"
+                    >
+                      <i class="bi bi-x-lg me-1"></i>Clear All
+                    </button>
+                  </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <button 
+                    v-for="cat in expenseCategoryOptions" 
+                    :key="cat"
+                    type="button"
+                    class="btn btn-sm"
+                    :class="selectedExpenseCategories.includes(cat) ? 'btn-primary' : 'btn-outline-secondary'"
+                    @click="toggleExpenseCategory(cat)"
+                  >
+                    <i v-if="selectedExpenseCategories.includes(cat)" class="bi bi-check-circle-fill me-1"></i>
+                    <i v-else class="bi bi-circle me-1"></i>
+                    {{ cat }}
+                  </button>
+                </div>
+              </div>
+              
               <div style="height: 300px;">
                 <Bar v-if="selectedChartType === 'monthly-comparison'" :data="monthlyComparisonData" :options="barChartOptions" />
                 <Doughnut v-else-if="selectedChartType === 'expense-breakdown'" :data="expenseBreakdownData" :options="doughnutChartOptions" />
@@ -531,7 +573,7 @@
 <script>
 import { useLoginStore } from '@/stores/loginStore'
 import { useNotificationStore } from '@/stores/notificationStore'
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authenticatedFetch } from '@/utils/api'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
@@ -609,6 +651,46 @@ export default {
 
     // Period selector: week | month | year | all-time
     const selectedPeriod = ref('month') // default 'month'
+
+    // Category filter for expense breakdown chart
+    const selectedExpenseCategories = ref([])
+    
+    // Get unique expense category names from transactions
+    const expenseCategoryOptions = computed(() => {
+      const uniqueCategories = new Set()
+      expenseList.value.forEach(transaction => {
+        const categoryName = transaction.category_name || 'Uncategorized'
+        uniqueCategories.add(categoryName)
+      })
+      return Array.from(uniqueCategories).sort()
+    })
+    
+    // Initialize selectedExpenseCategories with all categories
+    watch(expenseCategoryOptions, (newOptions) => {
+      if (newOptions.length > 0 && selectedExpenseCategories.value.length === 0) {
+        selectedExpenseCategories.value = [...newOptions]
+      }
+    }, { immediate: true })
+    
+    // Toggle individual category
+    function toggleExpenseCategory(category) {
+      const index = selectedExpenseCategories.value.indexOf(category)
+      if (index > -1) {
+        selectedExpenseCategories.value.splice(index, 1)
+      } else {
+        selectedExpenseCategories.value.push(category)
+      }
+    }
+    
+    // Select all categories
+    function selectAllExpenseCategories() {
+      selectedExpenseCategories.value = [...expenseCategoryOptions.value]
+    }
+    
+    // Deselect all categories
+    function deselectAllExpenseCategories() {
+      selectedExpenseCategories.value = []
+    }
 
     // Returns a local date key in the form "YYYY-MM-DD"
     function dateKey(d) {
@@ -796,6 +878,10 @@ export default {
         d.setHours(0,0,0,0)
         if (startDate && d < startDate) return // Only if it's not all-time
         const categoryName = transaction.category_name || 'Uncategorized'
+        
+        // Filter by selected categories
+        if (!selectedExpenseCategories.value.includes(categoryName)) return
+        
         const amount = convertCurrency(parseFloat(transaction.amount))
         categoryTotals[categoryName] = (categoryTotals[categoryName] || 0) + amount
       })
@@ -1690,6 +1776,11 @@ export default {
       convertCurrency,
       selectedChartType,
       selectedPeriod,
+      selectedExpenseCategories,
+      expenseCategoryOptions,
+      toggleExpenseCategory,
+      selectAllExpenseCategories,
+      deselectAllExpenseCategories,
       monthlyComparisonData,
       expenseBreakdownData,
       incomeBreakdownData,
