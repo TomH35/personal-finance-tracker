@@ -484,14 +484,12 @@ const createUser = async () => {
   }
 
   try {
-    // Use the correct API based on selected role
-    const apiUrl = newUser.value.role === 'admin'
-      ? '/backend/api/auth-api/admin-registration-api.php'
-      : '/backend/api/auth-api/user-registration-api.php'
+    const apiUrl = '/backend/api/auth-api/user-registration-api.php'
+    const payload = { ...newUser.value, is_admin_creation: true } // Flag for admin
 
     const res = await authenticatedFetch(apiUrl, {
       method: 'POST',
-      body: JSON.stringify(newUser.value)
+      body: JSON.stringify(payload)
     })
 
     const data = await res.json()
@@ -514,6 +512,7 @@ const createUser = async () => {
     alert('Error: ' + err.message)
   }
 }
+
 
 // OPEN EDIT USER MODAL
 const openEditUserModal = async (user) => {

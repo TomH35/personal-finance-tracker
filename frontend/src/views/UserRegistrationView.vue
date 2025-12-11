@@ -3,7 +3,7 @@
     <div class="row justify-content-center">
       <div class="col-12 col-md-8 col-lg-5">
         <RegistrationForm
-          @register="openCaptcha"
+          @register="(data, isAdmin = false) => openCaptcha(data, isAdmin)"
           :alert-message="alertMessage"
           :alert-type="alertType"
         />
@@ -30,18 +30,30 @@ const router = useRouter()
 
 const captchaVisible = ref(false)
 let tempRegData = null
+let adminCreation = false
 
 // Called when user clicks "register"
-function openCaptcha(userData) {
+function openCaptcha(userData, isAdmin = false) {
   tempRegData = userData
-  captchaVisible.value = true
+  adminCreation = isAdmin
+
+  if (isAdmin) {
+    // Ak admin, captcha sa preskočí, posielame flag
+    handleCaptchaSolved({}, isAdmin)
+  } else {
+    captchaVisible.value = true
+  }
 }
 
-// Called when captcha is solved
-async function handleCaptchaSolved(captchaData) {
+// Called when captcha is solved (admin skips)
+async function handleCaptchaSolved(captchaData, isAdmin = false) {
   captchaVisible.value = false
 
+  // add is_admin_creation flag if its admin 
   const payload = { ...tempRegData, ...captchaData }
+  if (isAdmin) {
+    payload.is_admin_creation = true
+  }
 
   alertMessage.value = ''
   alertType.value = ''
