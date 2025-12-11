@@ -484,18 +484,14 @@ const createUser = async () => {
   }
 
   try {
-    // Validate password requirements
+    // Use the correct API based on selected role
     const apiUrl = newUser.value.role === 'admin'
       ? '/backend/api/auth-api/admin-registration-api.php'
       : '/backend/api/auth-api/user-registration-api.php'
 
     const res = await authenticatedFetch(apiUrl, {
       method: 'POST',
-      body: JSON.stringify(newUser.value),
-      headers: {
-        'Content-Type': 'application/json',
-        ...(newUser.value.role !== 'user' ? { 'Authorization': `Bearer ${loginStore.jwt}` } : {})
-      }
+      body: JSON.stringify(newUser.value)
     })
 
     const data = await res.json()
