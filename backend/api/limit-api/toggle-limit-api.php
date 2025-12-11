@@ -6,9 +6,11 @@ header('Access-Control-Allow-Headers: Content-Type, Auth');
 
 require_once __DIR__ . '/../../class/class-limits.php';
 require_once __DIR__ . '/../../class/class-auth.php';
+require_once __DIR__ . '/../../class/class-notifications.php';
 
 $auth = new Auth();
 $limits = new Limits();
+$notifications = new Notifications();
 
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
 
@@ -28,5 +30,28 @@ if (!$limit_id) {
 }
 
 $result = $limits->toggleLimit($user_id, $limit_id, $enabled);
+
+// After toggling limits, recalculate notifications
+if ($result['success']) {
+    if ($enabled) {
+        // If enabling, recalculate to create notifications if needed
+        $notifications->recalculateLimitsForCurrentMonth($user_id, $limit_id);
+    } else {
+        // If disabling, remove current month's notifications
+        $current_month = date('Y-m');
+        $stmt = $notifications->db->prepare("
+            DELETE FROM notifications 
+            WHERE user_id = :user_id 
+            AND limit_id = :limit_id
+            AND DATE_FORMAT(created_at, '%Y-%m') = :current_month
+        ");
+        $stmt->execute([
+            'user_id' => $user_id,
+            'limit_id' => $limit_id,
+            'current_month' => $current_month
+        ]);
+    }
+}
+
 echo json_encode($result);
 ?>

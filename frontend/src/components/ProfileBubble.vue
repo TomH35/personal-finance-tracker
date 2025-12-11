@@ -70,7 +70,8 @@
                   {{ notification.type === 'critical' ? '🚨' : '⚠️' }}
                 </div>
                 <div class="notification-text">
-                  <div class="notification-message">{{ notification.message }}</div>
+                  <div class="notification-title">{{ getNotificationTitle(notification.message) }}</div>
+                  <div class="notification-message">{{ getNotificationBody(notification.message) }}</div>
                   <div class="notification-time">{{ formatTimestamp(notification.timestamp) }}</div>
                 </div>
               </div>
@@ -196,6 +197,17 @@ const formatTimestamp = (timestamp) => {
   if (diffDays < 7) return `${diffDays}d ago`
   
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const getNotificationTitle = (message) => {
+  // Extract month/year from beginning of message (e.g., "December 2025")
+  const match = message.match(/^([A-Za-z]+\s+\d{4})/)
+  return match ? match[1] : ''
+}
+
+const getNotificationBody = (message) => {
+  // Remove month/year prefix and newline
+  return message.replace(/^[A-Za-z]+\s+\d{4}\n/, '')
 }
 
 const deleteNotification = (id) => {
@@ -516,9 +528,16 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.notification-message {
-  font-size: 14px;
+.notification-title {
+  font-size: 13px;
+  font-weight: 600;
   color: #202124;
+  margin-bottom: 2px;
+}
+
+.notification-message {
+  font-size: 13px;
+  color: #5f6368;
   margin-bottom: 4px;
   word-wrap: break-word;
 }

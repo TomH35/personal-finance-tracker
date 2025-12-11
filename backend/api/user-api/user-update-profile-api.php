@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once '../../class/class-auth.php';
 require_once '../../class/class-user.php';
+require_once '../../class/class-notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -47,10 +48,20 @@ $username = $data['username'];
 $email = $data['email'];
 $currency = $data['currency'];
 
+// Get old currency to check if it changed
 $user = new User();
+$oldProfile = $user->getUserProfile($user_id);
+$oldCurrency = $oldProfile['user']['currency'] ?? null;
+
 $result = $user->updateUserProfile($user_id, $username, $email, $currency);
 
 if ($result['success']) {
+    // If currency changed, recalculate all notifications
+    if ($oldCurrency !== $currency) {
+        $notifications = new Notifications();
+        $notifications->recalculateAllNotificationsForCurrencyChange($user_id);
+    }
+    
     http_response_code(200);
     echo json_encode($result);
 } else {

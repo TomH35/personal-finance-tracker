@@ -6,6 +6,7 @@ header('Access-Control-Allow-Headers: Content-Type, Auth');
 
 require_once __DIR__ . '/../../class/class-transactions.php';
 require_once __DIR__ . '/../../class/class-auth.php';
+require_once __DIR__ . '/../../class/class-notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -14,6 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 $auth = new Auth();
 $transactions = new Transactions();
+$notifications = new Notifications();
 
 $data = json_decode(file_get_contents("php://input"), true);
 $jwt = str_replace('Bearer ', '', $_SERVER['HTTP_AUTH'] ?? '');
@@ -39,5 +41,18 @@ if (!$transaction_id) {
     exit();
 }
 
-echo json_encode($transactions->updateTransaction($transaction_id, $user_id, $amount, $category_id, $note, $date, $type, $userCurrency));
+$result = $transactions->updateTransaction($transaction_id, $user_id, $amount, $category_id, $note, $date, $type, $userCurrency);
+
+// If an expense was successfully updated, check spending limits for that month
+if ($result['success'] && $type === 'expense') {
+    $transaction_date = $date ? $date : date('Y-m-d');
+    $limit_check = $notifications->checkAndNotifySpendingLimits($user_id, $transaction_date);
+    // Add popup info to result
+    if (isset($limit_check['show_popup'])) {
+        $result['show_popup'] = $limit_check['show_popup'];
+        $result['notification_type'] = $limit_check['notification_type'];
+    }
+}
+
+echo json_encode($result);
 ?>

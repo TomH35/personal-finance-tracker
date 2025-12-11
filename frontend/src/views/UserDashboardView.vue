@@ -580,8 +580,8 @@ export default {
     const limitsEnabled = ref(false)
     const limitOverage = ref(0)
     const currentExpenseAmount = ref(0)
-    const warningShownThisSession = ref(false)
-    const criticalShownThisSession = ref(false)
+    // Track which months have shown modals (format: "YYYY-MM-warning" or "YYYY-MM-critical")
+    const shownModalsThisSession = ref(new Set())
 
     // Currency state
     const userCurrency = ref('USD')
@@ -1073,22 +1073,22 @@ export default {
       return totalIncome.value - totalExpenses.value
     })
 
-    // Calculate current month expenses in USD for limit checking
-    const currentMonthExpensesUSD = computed(() => {
-      const now = new Date()
-      const currentMonth = now.getMonth()
-      const currentYear = now.getFullYear()
+    // Calculate expenses for a specific month (given a date)
+    function calculateMonthExpenses(dateString) {
+      const targetDate = new Date(dateString)
+      const targetMonth = targetDate.getMonth()
+      const targetYear = targetDate.getFullYear()
       
       const monthExpenses = expenseList.value.filter(expense => {
         const expenseDate = new Date(expense.date)
-        return expenseDate.getMonth() === currentMonth && 
-               expenseDate.getFullYear() === currentYear
+        return expenseDate.getMonth() === targetMonth && 
+               expenseDate.getFullYear() === targetYear
       })
       
       const total = monthExpenses.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0)
-      console.log('Current month expenses (USD):', total, 'from', monthExpenses.length, 'transactions')
+      console.log(`Expenses for ${targetYear}-${targetMonth + 1}:`, total, 'from', monthExpenses.length, 'transactions')
       return total
-    })
+    }
 
     
     const filteredAndSortedTransactions = computed(() => {
@@ -1224,12 +1224,14 @@ export default {
       }
     }
 
-    function checkLimits(monthlyExpenses) {
+    function checkLimits(monthlyExpenses, transactionDate = null, forceShowType = null) {
       console.log('Checking limits:', {
         monthlyExpenses,
         warningLimit: warningLimit.value,
         criticalLimit: criticalLimit.value,
-        enabled: limitsEnabled.value
+        enabled: limitsEnabled.value,
+        transactionDate,
+        forceShowType
       })
       
       if (!limitsEnabled.value) {
@@ -1238,43 +1240,59 @@ export default {
       }
 
       currentExpenseAmount.value = monthlyExpenses
+      
+      // Calculate month keys for tracking
+      const yearMonth = transactionDate ? new Date(transactionDate).toISOString().slice(0, 7) : new Date().toISOString().slice(0, 7)
+      const criticalKey = `${yearMonth}-critical`
+      const warningKey = `${yearMonth}-warning`
+      
+      // If forceShowType is specified by backend, always show that modal
+      // Backend only sets this when threshold is first crossed
+      if (forceShowType === 'critical') {
+        limitOverage.value = monthlyExpenses - criticalLimit.value
+        const modal = new window.bootstrap.Modal(document.getElementById('limitCriticalModal'))
+        modal.show()
+        shownModalsThisSession.value.add(criticalKey)
+        return
+      } else if (forceShowType === 'warning') {
+        limitOverage.value = monthlyExpenses - warningLimit.value
+        const modal = new window.bootstrap.Modal(document.getElementById('limitWarningModal'))
+        modal.show()
+        shownModalsThisSession.value.add(warningKey)
+        return
+      }
+      
+      // Otherwise, use the old logic with per-month tracking for manual checks
+      // (yearMonth, criticalKey, and warningKey already defined above)
 
       // Check critical first - if critical is exceeded, only show critical modal
       if (monthlyExpenses >= criticalLimit.value) {
-        if (!criticalShownThisSession.value) {
+        if (!shownModalsThisSession.value.has(criticalKey)) {
           limitOverage.value = monthlyExpenses - criticalLimit.value
           console.log('Critical limit reached! Over by:', limitOverage.value)
-          criticalShownThisSession.value = true
+          shownModalsThisSession.value.add(criticalKey)
           
-          // Create notification with converted amounts
-          notificationStore.addNotification(
-            'critical',
-            `Critical limit exceeded! You've spent ${currencySymbol.value}${convertCurrency(monthlyExpenses).toFixed(2)} (over by ${currencySymbol.value}${convertCurrency(limitOverage.value).toFixed(2)})`
-          )
-          
+          // Show modal for immediate user feedback
+          // Note: Backend creates persistent notifications automatically
           const modal = new window.bootstrap.Modal(document.getElementById('limitCriticalModal'))
           modal.show()
         }
       } else if (monthlyExpenses >= warningLimit.value) {
-        if (!warningShownThisSession.value) {
+        if (!shownModalsThisSession.value.has(warningKey)) {
           limitOverage.value = monthlyExpenses - warningLimit.value
           console.log('Warning limit reached! Over by:', limitOverage.value)
-          warningShownThisSession.value = true
+          shownModalsThisSession.value.add(warningKey)
           
-          // Create notification with converted amounts
-          notificationStore.addNotification(
-            'warning',
-            `Warning limit reached! You've spent ${currencySymbol.value}${convertCurrency(monthlyExpenses).toFixed(2)} (over by ${currencySymbol.value}${convertCurrency(limitOverage.value).toFixed(2)})`
-          )
-          
+          // Show modal for immediate user feedback
+          // Note: Backend creates persistent notifications automatically
           const modal = new window.bootstrap.Modal(document.getElementById('limitWarningModal'))
           modal.show()
         }
       } else {
         console.log('Within limits')
-        // Reset flags if user goes back under the limits
-        warningShownThisSession.value = false
-        criticalShownThisSession.value = false
+        // Remove flags for this month if user goes back under the limits
+        shownModalsThisSession.value.delete(warningKey)
+        shownModalsThisSession.value.delete(criticalKey)
       }
     }
 
@@ -1299,6 +1317,7 @@ export default {
         if (data.success) {
           successMessage.value = 'Transaction added successfully!'
           const wasExpense = formData.value.type === 'expense'
+          const transactionDate = formData.value.date
           formData.value = {
             type: 'income',
             amount: '',
@@ -1308,9 +1327,14 @@ export default {
           }
           await loadAllTransactions()
           
-          // Check limits after adding expense
+          // Reload notifications and optionally show popup
           if (wasExpense) {
-            checkLimits(currentMonthExpensesUSD.value)
+            await notificationStore.loadNotifications()
+            // Only show popup if backend says to (first time exceeding threshold this month)
+            if (data.show_popup && data.notification_type) {
+              const monthExpenses = calculateMonthExpenses(transactionDate)
+              checkLimits(monthExpenses, transactionDate, data.notification_type)
+            }
           }
           
           setTimeout(() => successMessage.value = '', 3000)
@@ -1339,8 +1363,16 @@ export default {
 
         if (data.success) {
           successMessage.value = 'Transaction deleted successfully!'
+          
+          // Store transaction info before reloading
+          const wasExpense = type === 'expense'
+          
           await loadAllTransactions()
-          checkLimits(currentMonthExpensesUSD.value)
+          
+          // Reload notifications (no popup on delete)
+          if (wasExpense) {
+            await notificationStore.loadNotifications()
+          }
           setTimeout(() => successMessage.value = '', 3000)
         } else {
           errorMessage.value = data.message || 'Failed to delete transaction'
@@ -1435,11 +1467,23 @@ export default {
         if (data.success) {
           successMessage.value = 'Transaction updated successfully!'
           
+          const wasExpense = editFormData.value.type === 'expense'
+          const transactionDate = editFormData.value.date
+          
           const modal = window.bootstrap.Modal.getInstance(document.getElementById('editIncomeModal'))
           modal.hide()
           editingId.value = null
           await loadAllTransactions()
-          checkLimits(currentMonthExpensesUSD.value)
+          
+          // Reload notifications and optionally show popup
+          if (wasExpense) {
+            await notificationStore.loadNotifications()
+            // Only show popup if backend says to
+            if (data.show_popup && data.notification_type) {
+              const monthExpenses = calculateMonthExpenses(transactionDate)
+              checkLimits(monthExpenses, transactionDate, data.notification_type)
+            }
+          }
           setTimeout(() => successMessage.value = '', 3000)
         } else {
           errorMessage.value = data.message || 'Failed to update transaction'
@@ -1641,7 +1685,6 @@ export default {
       limitsEnabled,
       limitOverage,
       currentExpenseAmount,
-      currentMonthExpensesUSD,
       userCurrency,
       currencySymbol,
       convertCurrency,

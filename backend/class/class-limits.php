@@ -50,7 +50,8 @@ class Limits {
                 'critical' => $criticalUSD,
                 'enabled' => $enabled
             ]);
-            return ['success' => true, 'message' => 'Limit created'];
+            $limit_id = $pdo->lastInsertId();
+            return ['success' => true, 'message' => 'Limit created', 'limit_id' => $limit_id];
         } catch (PDOException $e) {
             return ['success' => false, 'message' => 'Database error: ' . $e->getMessage()];
         } catch (Exception $e) {
