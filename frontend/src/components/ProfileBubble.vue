@@ -67,7 +67,12 @@
             >
               <div class="notification-content">
                 <div class="notification-icon">
-                  {{ notification.type === 'critical' ? '🚨' : '⚠️' }}
+                  <svg v-if="notification.type === 'critical'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#CD5C5C" viewBox="0 0 16 16">
+                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                  </svg>
+                  <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#f9ab00" viewBox="0 0 16 16">
+                    <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                  </svg>
                 </div>
                 <div class="notification-text">
                   <div class="notification-title">{{ getNotificationTitle(notification.message) }}</div>
@@ -94,7 +99,12 @@
             class="dropdown-item"
             @click="closeDropdown"
           >
-            <span class="dropdown-icon">⚙️</span>
+            <span class="dropdown-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/>
+                <path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319z"/>
+              </svg>
+            </span>
             <span>Settings</span>
           </RouterLink>
           
@@ -102,7 +112,12 @@
             class="dropdown-item logout-item" 
             @click="handleLogout"
           >
-            <span class="dropdown-icon">🚪</span>
+            <span class="dropdown-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M10 12.5a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 .5.5v2a.5.5 0 0 0 1 0v-2A1.5 1.5 0 0 0 9.5 2h-8A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h8a1.5 1.5 0 0 0 1.5-1.5v-2a.5.5 0 0 0-1 0v2z"/>
+                <path fill-rule="evenodd" d="M15.854 8.354a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L14.293 7.5H5.5a.5.5 0 0 0 0 1h8.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3z"/>
+              </svg>
+            </span>
             <span>Logout</span>
           </button>
         </div>
@@ -291,7 +306,7 @@ onUnmounted(() => {
   position: absolute;
   top: -4px;
   right: -4px;
-  background: #d93025;
+  background: #CD5C5C;
   color: white;
   font-size: 10px;
   font-weight: 600;
@@ -310,11 +325,11 @@ onUnmounted(() => {
   height: 36px;
   border-radius: 50%;
   overflow: hidden;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-color: #1D2A5B;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   transition: transform 0.2s ease;
 }
 
@@ -361,7 +376,7 @@ onUnmounted(() => {
   height: 56px;
   border-radius: 50%;
   overflow: hidden;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-color: #1D2A5B;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -443,7 +458,7 @@ onUnmounted(() => {
 }
 
 .logout-item {
-  color: #d93025;
+  color: #CD5C5C;
 }
 
 /* Notifications Section */
@@ -469,7 +484,7 @@ onUnmounted(() => {
 .clear-all-btn {
   background: none;
   border: none;
-  color: #1a73e8;
+  color: #1D2A5B;
   font-size: 13px;
   cursor: pointer;
   padding: 4px 8px;
@@ -478,7 +493,7 @@ onUnmounted(() => {
 }
 
 .clear-all-btn:hover {
-  background-color: rgba(26, 115, 232, 0.1);
+  background-color: rgba(11, 11, 69, 0.1);
 }
 
 .notifications-list {
@@ -504,7 +519,7 @@ onUnmounted(() => {
 }
 
 .notification-item.critical {
-  border-left-color: #d93025;
+  border-left-color: #CD5C5C;
 }
 
 .notification-item:hover {
@@ -519,8 +534,10 @@ onUnmounted(() => {
 }
 
 .notification-icon {
-  font-size: 20px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .notification-text {
@@ -594,6 +611,13 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .profile-dropdown {
     min-width: 260px;
+  }
+}
+
+@media (max-width: 340px) {
+  .profile-dropdown {
+    right: auto;
+    transform: translateX(-70%);
   }
 }
 </style>

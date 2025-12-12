@@ -1,5 +1,6 @@
 import 'bootstrap'
 import 'bootstrap/dist/css/bootstrap.min.css'
+import './assets/bootstrap-overrides.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import { useLoginStore } from './stores/loginStore'
 import { createApp } from 'vue'

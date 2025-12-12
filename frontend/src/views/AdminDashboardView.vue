@@ -70,6 +70,26 @@ const newTip = ref({ title: '', content: '' })
 const editTipData = ref({ id: null, title: '', content: '' })
 const tipError = ref('')
 
+const userSearch = ref('')
+const filteredUsers = computed(() => {
+  const query = userSearch.value.trim().toLowerCase()
+  if (!query) return users.value
+  return users.value.filter((user) => {
+    const name = String(user.username || '').toLowerCase()
+    const email = String(user.email || '').toLowerCase()
+    const id = String(user.user_id || '').toLowerCase()
+    return name.includes(query) || email.includes(query) || id.includes(query)
+  })
+})
+
+const totalUsers = computed(() => users.value.length)
+const adminCount = computed(() => users.value.filter(user => user.role === 'admin').length)
+const regularUserCount = computed(() => Math.max(totalUsers.value - adminCount.value, 0))
+const totalCategories = computed(() => categories.value.length)
+const expenseCategoryCount = computed(() => categories.value.filter(cat => cat.type === 'expense').length)
+const totalTips = computed(() => tips.value.length)
+const featuredTips = computed(() => tips.value.slice(0, 3))
+
 // User data management (transactions + categories)
 const getDefaultTransactionForm = () => ({
   id: null,
@@ -738,176 +758,308 @@ const deleteTip = async (id) => {
 </script>
 
 <template>
-  <div class="container-fluid">
-    <div class="row">
+  <div class="min-vh-100" style="background-color: #f8f9fa;">
+    <div class="container-fluid p-0">
+      <div class="row g-0">
 
-      <!-- Sidebar -->
-      <nav class="col-md-3 col-lg-2 d-md-block bg-white border-end min-vh-100 p-3">
-        <h5 class="text-primary mb-4">Dashboard</h5>
-        <div class="nav flex-column nav-pills" id="adminTab" role="tablist" aria-orientation="vertical">
-          <button class="nav-link active mb-2 text-start" id="users-tab" data-bs-toggle="tab" data-bs-target="#users"
-            type="button" role="tab">👥 Users</button>
-          <button class="nav-link mb-2 text-start" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories"
-            type="button" role="tab">🗂️ Categories</button>
-          <button class="nav-link mb-2 text-start" id="tips-tab" data-bs-toggle="tab" data-bs-target="#tips"
-            type="button" role="tab">💡 Tips</button>
-        </div>
-      </nav>
+        <!-- Sidebar -->
+        <nav class="col-md-4 col-lg-3 d-md-block bg-white border-end min-vh-100 p-0">
+          <div class="p-4">
+            <h5 class="fw-bold mb-4" style="color: #1D2A5B;">Admin Overview</h5>
 
-      <!-- Main content -->
-      <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
-        <h2 class="fw-semibold mb-4">Admin Panel</h2>
+            <div class="card border shadow-sm mb-4">
+              <div class="card-body p-4">
+                <h6 class="fw-semibold mb-3 text-uppercase small text-muted">Snapshot</h6>
+                <ul class="list-unstyled mb-0">
+                  <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-secondary">Total Users</span>
+                    <span class="fw-bold text-dark">{{ totalUsers }}</span>
+                  </li>
+                  <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-secondary">Admins</span>
+                    <span class="fw-bold text-dark">{{ adminCount }}</span>
+                  </li>
+                  <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-secondary">Members</span>
+                    <span class="fw-bold text-dark">{{ regularUserCount }}</span>
+                  </li>
+                  <li class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <span class="text-secondary">Categories</span>
+                    <span class="fw-bold text-dark">{{ totalCategories }}</span>
+                  </li>
+                  <li class="d-flex justify-content-between align-items-center py-2">
+                    <span class="text-secondary">Tips</span>
+                    <span class="fw-bold text-dark">{{ totalTips }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
 
-        <div class="tab-content" id="adminTabContent">
-
-          <!-- USERS -->
-          <div class="tab-pane fade show active" id="users" role="tabpanel">
-            <div class="card shadow-sm border-0">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h5 class="card-title mb-0">Users List</h5>
-                  <button class="btn btn-sm btn-primary" @click="openAddUserModal">+ Add User</button>
+            <div class="card border shadow-sm mb-4">
+              <div class="card-body p-4">
+                <h6 class="fw-semibold mb-3 text-uppercase small text-muted">Quick Actions</h6>
+                <div class="d-grid gap-2">
+                  <button class="btn btn-primary d-flex align-items-center justify-content-center gap-2" @click="openAddUserModal">
+                    <i class="bi bi-person-plus"></i>
+                    <span>Add User</span>
+                  </button>
+                  <button class="btn btn-outline-primary d-flex align-items-center justify-content-center gap-2" @click="getCategories">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <span>Refresh Categories</span>
+                  </button>
+                  <button class="btn btn-outline-primary d-flex align-items-center justify-content-center gap-2" @click="getTips">
+                    <i class="bi bi-lightbulb"></i>
+                    <span>Refresh Tips</span>
+                  </button>
                 </div>
-                <div class="table-responsive">
-                  <table class="table align-middle table-hover">
-                    <thead class="table-primary">
-                      <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th class="text-end">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="user in users" :key="user.user_id">
-                        <td>{{ user.user_id }}</td>
-                        <td>{{ user.username }}</td>
-                        <td>{{ user.email }}</td>
-                        <td v-if="user.role == 'admin'"><span class="badge bg-success">Admin</span></td>
-                        <td v-else><span class="badge bg-secondary">User</span></td>
-                        <td class="text-end">
-                          <button class="btn btn-sm btn-outline-info me-1"
-                            @click="openUserDataModal(user)">Edit Data</button>
-                          <button class="btn btn-sm btn-outline-warning me-1"
-                            @click="openEditUserModal(user)">Edit</button>
-                          <button class="btn btn-sm btn-outline-danger"
-                            @click="deleteUser(user.user_id)">Delete</button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+              </div>
+            </div>
+
+            <div class="card border shadow-sm">
+              <div class="card-body p-4">
+                <h6 class="fw-semibold mb-3 text-uppercase small text-muted">Latest Tips</h6>
+                <div v-if="featuredTips.length" class="d-flex flex-column gap-3">
+                  <div v-for="tip in featuredTips" :key="tip.id" class="p-3 rounded border" style="background-color: #f8f9fa;">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                      <h6 class="fw-semibold mb-0">{{ tip.title }}</h6>
+                      <span class="badge bg-light text-dark small">{{ tip.created_at ? new Date(tip.created_at).toLocaleDateString() : '—' }}</span>
+                    </div>
+                    <p class="text-muted small mb-0">{{ tip.content.length > 90 ? tip.content.substring(0, 90) + '...' : tip.content }}</p>
+                  </div>
                 </div>
-                <div v-if="alertVisible" class="alert alert-success" role="alert">
-                  {{ alertMessage }}
+                <p v-else class="text-muted small mb-0">No tips published yet.</p>
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="col-md-8 ms-sm-auto col-lg-9 p-4">
+          <div class="mb-4">
+            <h2 class="fw-bold text-dark mb-1">Admin Control Center</h2>
+            <p class="text-muted mb-0">Manage users, categories, and educational content with a modern workspace.</p>
+          </div>
+
+          <div v-if="alertVisible" class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ alertMessage }}
+            <button type="button" class="btn-close" @click="alertVisible = false"></button>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-lg-4">
+              <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #1D2A5B, #3D64A8);">
+                <div class="card-body text-white">
+                  <p class="text-uppercase small mb-1 opacity-75">Total Users</p>
+                  <h3 class="fw-bold mb-0">{{ totalUsers }}</h3>
+                  <small class="opacity-75">{{ adminCount }} admins &middot; {{ regularUserCount }} members</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+              <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #1E9E63, #4CD4A8);">
+                <div class="card-body text-white">
+                  <p class="text-uppercase small mb-1 opacity-75">Categories</p>
+                  <h3 class="fw-bold mb-0">{{ totalCategories }}</h3>
+                  <small class="opacity-75">{{ expenseCategoryCount }} expense categories</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+              <div class="card border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #B85CFF, #6F3CD7);">
+                <div class="card-body text-white">
+                  <p class="text-uppercase small mb-1 opacity-75">Financial Tips</p>
+                  <h3 class="fw-bold mb-0">{{ totalTips }}</h3>
+                  <small class="opacity-75">Empower users with guidance</small>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- CATEGORIES -->
-          <div class="tab-pane fade" id="categories" role="tabpanel">
-            <div class="card shadow-sm border-0">
-              <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h5 class="card-title mb-0">Categories</h5>
-                  <div class="input-group" style="max-width: 400px;">
-                    <input v-model="newCategory" type="text" class="form-control" placeholder="New category">
+          <section id="users-panel" class="mb-5">
+            <div class="card border shadow-sm">
+              <div class="card-body p-4">
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+                  <div>
+                    <h5 class="fw-bold mb-1" style="color: #1D2A5B;">Users</h5>
+                    <p class="text-muted small mb-0">Search, edit, or remove any account instantly.</p>
+                  </div>
+                  <div class="d-flex flex-wrap gap-2">
+                    <div class="input-group input-group-sm" style="min-width: 240px;">
+                      <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                      <input v-model="userSearch" type="search" class="form-control border-start-0" placeholder="Search by name, email, or ID" />
+                    </div>
+                    <button class="btn btn-primary btn-sm" @click="openAddUserModal">
+                      <i class="bi bi-plus-circle me-1"></i>
+                      Add User
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="userError" class="alert alert-danger mb-3">{{ userError }}</div>
+
+                <div v-if="filteredUsers.length" class="table-responsive">
+                  <table class="table align-middle table-hover mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th class="text-uppercase small text-muted">ID</th>
+                        <th class="text-uppercase small text-muted">Name</th>
+                        <th class="text-uppercase small text-muted">Email</th>
+                        <th class="text-uppercase small text-muted">Role</th>
+                        <th class="text-end text-uppercase small text-muted">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="user in filteredUsers" :key="user.user_id">
+                        <td class="fw-semibold">{{ user.user_id }}</td>
+                        <td>{{ user.username }}</td>
+                        <td class="text-muted">{{ user.email }}</td>
+                        <td>
+                          <span :class="user.role === 'admin' ? 'badge bg-success' : 'badge bg-secondary'">
+                            {{ user.role === 'admin' ? 'Admin' : 'User' }}
+                          </span>
+                        </td>
+                        <td class="text-end">
+                          <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-primary" @click="openUserDataModal(user)">
+                              Manage Data
+                            </button>
+                            <button class="btn btn-outline-secondary" @click="openEditUserModal(user)">
+                              Edit
+                            </button>
+                            <button class="btn btn-outline-danger" @click="deleteUser(user.user_id)">
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p v-else class="text-center text-muted py-4 mb-0">No users match your search right now.</p>
+              </div>
+            </div>
+          </section>
+
+          <section id="categories-panel" class="mb-5">
+            <div class="card border shadow-sm">
+              <div class="card-body p-4">
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+                  <div>
+                    <h5 class="fw-bold mb-1" style="color: #1D2A5B;">Categories</h5>
+                    <p class="text-muted small mb-0">Standardize expense tracking with curated categories.</p>
+                  </div>
+                  <div class="text-muted small">{{ totalCategories }} total categories</div>
+                </div>
+
+                <div class="row g-3 align-items-end mb-4">
+                  <div class="col-md-6 col-lg-5">
+                    <label class="form-label small text-muted">Category Name</label>
+                    <input v-model="newCategory" type="text" class="form-control" placeholder="Enter category name" />
+                  </div>
+                  <div class="col-md-3 col-lg-3">
+                    <label class="form-label small text-muted">Type</label>
                     <select v-model="newCategoryType" class="form-select">
                       <option value="expense">Expense</option>
                     </select>
-                    <button class="btn btn-primary" @click="addCategory">Add</button>
+                  </div>
+                  <div class="col-md-3 col-lg-2">
+                    <button class="btn btn-primary w-100" style="margin-top: 1.95rem;" @click="addCategory">Add</button>
                   </div>
                 </div>
+
+                <div v-if="categoryError" class="alert alert-danger mb-3">{{ categoryError }}</div>
+
                 <div class="table-responsive">
-                  <table class="table align-middle table-hover">
-                    <thead class="table-primary">
+                  <table class="table align-middle table-hover mb-0">
+                    <thead class="table-light">
                       <tr>
-                        <th>#</th>
-                        <th>Category Name</th>
-                        <th>Type</th>
-                        <th class="text-end">Actions</th>
+                        <th class="text-uppercase small text-muted">ID</th>
+                        <th class="text-uppercase small text-muted">Category</th>
+                        <th class="text-uppercase small text-muted">Type</th>
+                        <th class="text-end text-uppercase small text-muted">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="category in categories" :key="category.id">
-                        <td>{{ category.id }}</td>
+                        <td class="fw-semibold">{{ category.id }}</td>
                         <td>{{ category.name }}</td>
                         <td>
-                          <span v-if="category.type === 'expense'" class="badge bg-danger">Expense</span>
+                          <span class="badge bg-danger">{{ category.type }}</span>
                         </td>
                         <td class="text-end">
-                          <button class="btn btn-sm btn-outline-warning me-1"
-                            @click="openEditCategoryModal(category)">Edit</button>
-                          <button class="btn btn-sm btn-outline-danger"
-                            @click="deleteCategory(category.id)">Delete</button>
+                          <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-secondary" @click="openEditCategoryModal(category)">Edit</button>
+                            <button class="btn btn-outline-danger" @click="deleteCategory(category.id)">Delete</button>
+                          </div>
                         </td>
                       </tr>
                     </tbody>
                   </table>
-                  <p v-if="categoryError" class="text-danger mt-2">{{ categoryError }}</p>
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
-          <!-- TIPS -->
-          <div class="tab-pane fade" id="tips" role="tabpanel">
-            <div class="card shadow-sm border-0">
-              <div class="card-body">
-                <h5 class="card-title mb-3">Financial Tips</h5>
-                
-                <!-- Add New Tip Section -->
-                <div class="card mb-3 bg-light">
-                  <div class="card-body">
-                    <h6 class="card-subtitle mb-3">Add New Tip</h6>
-                    <div class="mb-2">
-                      <input v-model="newTip.title" type="text" class="form-control" placeholder="Tip title" maxlength="255">
-                    </div>
-                    <div class="mb-2">
-                      <textarea v-model="newTip.content" class="form-control" placeholder="Tip content" rows="3"></textarea>
-                    </div>
-                    <button class="btn btn-primary btn-sm" @click="createTip">Add Tip</button>
+          <section id="tips-panel" class="mb-3">
+            <div class="card border shadow-sm">
+              <div class="card-body p-4">
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+                  <div>
+                    <h5 class="fw-bold mb-1" style="color: #1D2A5B;">Financial Tips</h5>
+                    <p class="text-muted small mb-0">Share timely guidance to keep your community motivated.</p>
+                  </div>
+                  <div class="text-muted small">{{ totalTips }} published tips</div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                  <div class="col-md-4">
+                    <label class="form-label small text-muted">Tip Title</label>
+                    <input v-model="newTip.title" type="text" class="form-control" placeholder="Tip title" maxlength="255" />
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small text-muted">Content</label>
+                    <textarea v-model="newTip.content" class="form-control" rows="1" placeholder="Write a short, actionable insight"></textarea>
+                  </div>
+                  <div class="col-md-2 d-grid">
+                    <button class="btn btn-primary" style="margin-top: 1.95rem;" @click="createTip">Publish</button>
                   </div>
                 </div>
 
-                <div class="table-responsive">
-                  <table class="table align-middle table-hover">
-                    <thead class="table-primary">
+                <div v-if="tipError" class="alert alert-danger mb-3">{{ tipError }}</div>
+
+                <div v-if="tips.length" class="table-responsive">
+                  <table class="table align-middle table-hover mb-0">
+                    <thead class="table-light">
                       <tr>
-                        <th>#</th>
-                        <th>Title</th>
-                        <th>Content</th>
-                        <th>Created</th>
-                        <th class="text-end">Actions</th>
+                        <th class="text-uppercase small text-muted">ID</th>
+                        <th class="text-uppercase small text-muted">Title</th>
+                        <th class="text-uppercase small text-muted">Content</th>
+                        <th class="text-uppercase small text-muted">Created</th>
+                        <th class="text-end text-uppercase small text-muted">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="tip in tips" :key="tip.id">
-                        <td>{{ tip.id }}</td>
+                        <td class="fw-semibold">{{ tip.id }}</td>
                         <td>{{ tip.title }}</td>
-                        <td>{{ tip.content.substring(0, 50) }}{{ tip.content.length > 50 ? '...' : '' }}</td>
-                        <td>{{ new Date(tip.created_at).toLocaleDateString() }}</td>
+                        <td class="text-muted">{{ tip.content.substring(0, 90) }}{{ tip.content.length > 90 ? '...' : '' }}</td>
+                        <td>{{ tip.created_at ? new Date(tip.created_at).toLocaleDateString() : '—' }}</td>
                         <td class="text-end">
-                          <button class="btn btn-sm btn-outline-warning me-1"
-                            @click="openEditTipModal(tip)">Edit</button>
-                          <button class="btn btn-sm btn-outline-danger"
-                            @click="deleteTip(tip.id)">Delete</button>
+                          <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-secondary" @click="openEditTipModal(tip)">Edit</button>
+                            <button class="btn btn-outline-danger" @click="deleteTip(tip.id)">Delete</button>
+                          </div>
                         </td>
                       </tr>
                     </tbody>
                   </table>
-                  <p v-if="tipError" class="text-danger mt-2">{{ tipError }}</p>
                 </div>
-                <div v-if="alertVisible" class="alert alert-success" role="alert">
-                  {{ alertMessage }}
-                </div>
+                <p v-else class="text-center text-muted py-4 mb-0">No tips yet. Publish your first guidance above.</p>
               </div>
             </div>
-          </div>
-
-        </div>
-      </main>
+          </section>
+        </main>
+      </div>
     </div>
 
     <!-- User Data Modal -->
