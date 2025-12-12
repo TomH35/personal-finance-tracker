@@ -63,7 +63,7 @@ async function handleLoginClick(data) {
   const resData = await response.json()
 
   if (resData.success) {
-    loginStore.setJwt(resData.token)
+    loginStore.setJwt(resData.token, data.remember)
     if (resData.refresh_token) {
       loginStore.setRefreshToken(resData.refresh_token)
     }
@@ -117,7 +117,7 @@ async function sendLoginRequest(payload) {
   const data = await response.json()
 
   if (data.success) {
-    loginStore.setJwt(data.token)
+    loginStore.setJwt(data.token, tempLoginData.remember)
     if (data.refresh_token) {
       loginStore.setRefreshToken(data.refresh_token)
     }

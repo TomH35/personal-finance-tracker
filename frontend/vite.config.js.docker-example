@@ -19,7 +19,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/backend': {
-        target: 'http://localhost/personal-finance-tracker/',
+        target: 'http://pft-php-server:80/personal-finance-tracker/',
         changeOrigin: true,
         // rewrite: (path) => path.replace(/^\/backend/, ''),
       },
