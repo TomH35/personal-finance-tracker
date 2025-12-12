@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Auth');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit();
 
@@ -15,11 +15,28 @@ $endpoint = "user_registration";
 $rateLimiter = new RateLimiter();
 
 $input = json_decode(file_get_contents('php://input'), true);
+
 $username = $input['username'] ?? '';
 $email    = $input['email'] ?? '';
 $password = $input['password'] ?? '';
+$role     = $input['role'] ?? 'user';
 
-// captcha fields (registration requires captcha)
+// Get JWT from Authorization header
+$jwtHeader = $_SERVER['HTTP_AUTH'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? null;
+$jwt = null;
+if ($jwtHeader) {
+    if (stripos($jwtHeader, 'Bearer ') === 0) {
+        $jwt = trim(substr($jwtHeader, 7));
+    } else {
+        $jwt = trim($jwtHeader);
+    }
+}
+
+// Check if admin
+$auth = new Auth();
+$isAdmin = $jwt ? $auth->isAdmin($jwt) : false;
+
+// captcha fields (only required if not admin)
 $captchaA = isset($input['captcha_a']) ? (int)$input['captcha_a'] : null;
 $captchaB = isset($input['captcha_b']) ? (int)$input['captcha_b'] : null;
 $captchaAnswer = isset($input['captcha_answer']) ? (int)$input['captcha_answer'] : null;
@@ -32,24 +49,25 @@ if ($rateLimiter->isBlocked($ip, $endpoint)) {
     exit();
 }
 
-// Require captcha for registration (simple stateless math captcha)
-if ($captchaA === null || $captchaB === null || $captchaAnswer === null) {
-    $rateLimiter->registerAttempt($ip, $endpoint, null);
-    http_response_code(400);
-    echo json_encode(['success'=>false,'message'=>'Captcha required for registration']);
-    exit();
-}
+// Require captcha only for normal users
+if (!$isAdmin) {
+    if ($captchaA === null || $captchaB === null || $captchaAnswer === null) {
+        $rateLimiter->registerAttempt($ip, $endpoint, null);
+        http_response_code(400);
+        echo json_encode(['success'=>false,'message'=>'Captcha required for registration']);
+        exit();
+    }
 
-if (($captchaA + $captchaB) !== $captchaAnswer) {
-    $rateLimiter->registerAttempt($ip, $endpoint, null);
-    http_response_code(403);
-    echo json_encode(['success'=>false,'message'=>'Invalid captcha for registration']);
-    exit();
+    if (($captchaA + $captchaB) !== $captchaAnswer) {
+        $rateLimiter->registerAttempt($ip, $endpoint, null);
+        http_response_code(403);
+        echo json_encode(['success'=>false,'message'=>'Invalid captcha for registration']);
+        exit();
+    }
 }
 
 // Attempt registration
-$auth = new Auth();
-$result = $auth->registerUser($username, $email, $password);
+$result = $auth->registerUser($username, $email, $password, $role);
 
 // Determine user_id if registration successful
 $userId = $result['success'] ? ($result['user_id'] ?? null) : null;
@@ -64,5 +82,7 @@ if (!$rateLimiter->checkLimit($ip, $endpoint, $userId)) {
     exit();
 }
 
+// Response
 http_response_code($result['success'] ? 201 : 400);
 echo json_encode($result);
+?>

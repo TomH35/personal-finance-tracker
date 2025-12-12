@@ -24,9 +24,14 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 
 $identifier = $input['identifier'] ?? ''; // email or username
 $password = $input['password'] ?? '';
+$remember = $input['remember'] ?? false;
 
 $auth = new Auth();
-$result = $auth->loginUser($identifier, $password, 'admin'); // hardcoded role admin
+if ($remember) {
+    $result = $auth->loginUser($identifier, $password, 'admin'); // hardcoded role admin
+} else {
+    $result = $auth->temporaryUserLogin($identifier, $password, 'admin'); // hardcoded role admin
+}
 
 if ($result['success']) {
     http_response_code(200);

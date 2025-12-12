@@ -23,4 +23,5 @@ COPY . ./personal-finance-tracker/backend/
 # Expose php port
 EXPOSE 80
 
-CMD ["php", "-S", "0.0.0.0:80", "-t", "."]
+# Register the admin and start the server
+CMD ["sh", "-c", "php ./personal-finance-tracker/backend/services/admin-creation-script.php && php -S 0.0.0.0:80 -t ."]

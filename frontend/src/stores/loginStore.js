@@ -10,15 +10,31 @@ export const useLoginStore = defineStore('loginStore', () => {
   const isRefreshing = ref(false)
   let refreshPromise = null
 
-  // Save JWT to store and localStorage
-  function setJwt(token) {
+  // Save JWT to store and localStorage or sessionStorage
+  function setJwt(token, remember = true) {
     jwt.value = token
-    localStorage.setItem('jwt', token)
+    if (remember) {
+      // Persistent login - use localStorage
+      localStorage.setItem('jwt', token)
+      sessionStorage.removeItem('jwt') // Clear session storage if exists
+    } else {
+      // Temporary login - use sessionStorage (cleared when browser closes)
+      sessionStorage.setItem('jwt', token)
+      localStorage.removeItem('jwt') // Clear localStorage if exists
+    }
   }
 
-  // Load JWT from localStorage
+  // Load JWT from sessionStorage or localStorage
   function loadJwt() {
-    const token = localStorage.getItem('jwt')
+    // Check sessionStorage first (temporary login)
+    let token = sessionStorage.getItem('jwt')
+    if (token) {
+      jwt.value = token
+      return
+    }
+    
+    // Then check localStorage (persistent login)
+    token = localStorage.getItem('jwt')
     if (token) {
       jwt.value = token
     }
@@ -58,6 +74,7 @@ export const useLoginStore = defineStore('loginStore', () => {
     jwt.value = ''
     refreshToken.value = ''
     localStorage.removeItem('jwt')
+    sessionStorage.removeItem('jwt') // Also clear sessionStorage
     localStorage.removeItem('refreshToken')
 
     userData.value = null
@@ -115,6 +132,7 @@ export const useLoginStore = defineStore('loginStore', () => {
           jwt.value = ''
           refreshToken.value = ''
           localStorage.removeItem('jwt')
+          sessionStorage.removeItem('jwt') // Also clear sessionStorage
           localStorage.removeItem('refreshToken')
           userData.value = null
           localStorage.removeItem('userData')
