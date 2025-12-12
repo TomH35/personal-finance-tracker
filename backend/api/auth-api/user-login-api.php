@@ -17,6 +17,7 @@ $rateLimiter = new RateLimiter();
 $input = json_decode(file_get_contents('php://input'), true);
 $identifier = $input['identifier'] ?? '';
 $password   = $input['password'] ?? '';
+$remember = $input['remember'] ?? false;
 
 // captcha fields (stateless simple math captcha)
 $captchaA = isset($input['captcha_a']) ? (int)$input['captcha_a'] : null;
@@ -72,7 +73,11 @@ if ($captchaRequired) {
 
 // Attempt login
 $auth = new Auth();
-$result = $auth->loginUser($identifier, $password);
+if ($remember) {
+    $result = $auth->loginUser($identifier, $password);
+} else {
+    $result = $auth->temporaryUserLogin($identifier, $password);
+}
 
 // Determine user_id if login successful
 $userId = $result['success'] ? ($result['user']['user_id'] ?? null) : null;

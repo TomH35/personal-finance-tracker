@@ -292,6 +292,111 @@ class Auth {
     }
 
     /**
+     * Log in a user temporary
+     * 
+     * @param string $identifier The user's email or username
+     * @param string $password The plain text password
+     * @param string $expectedRole The expected role ('admin' or 'user')
+     * @return array Response array with success status, message, and token if successful
+     */
+    public function temporaryUserLogin($identifier, $password, $expectedRole = 'user') {
+        try {
+            $pdo = $this->db->getPdo();
+
+            // Validate input
+            if (empty($identifier) || empty($password)) {
+                return [
+                    'success' => false,
+                    'message' => 'Identifier and password are required'
+                ];
+            }
+
+            // Find user
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :identifier OR username = :identifier LIMIT 1");
+            $stmt->execute(['identifier' => $identifier]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user) {
+                return [
+                    'success' => false,
+                    'message' => 'Invalid identifier or password'
+                ];
+            }
+
+            // Verify password
+            if (!password_verify($password, $user['password_hash'])) {
+                return [
+                    'success' => false,
+                    'message' => 'Invalid identifier or password'
+                ];
+            }
+
+            // Check user role matches expected role
+            // If expectedRole is 'user', allow both 'user' and 'admin' roles
+            // If expectedRole is 'admin', only allow 'admin' role
+            if ($expectedRole === 'user') {
+                if ($user['role'] !== 'user' && $user['role'] !== 'admin') {
+                    return [
+                        'success' => false,
+                        'message' => 'Access denied. Invalid user role.'
+                    ];
+                }
+            } elseif ($expectedRole === 'admin') {
+                if ($user['role'] !== 'admin') {
+                    return [
+                        'success' => false,
+                        'message' => 'Access denied. Only Admins are allowed.'
+                    ];
+                }
+            }
+
+            // Prepare JWT payload
+            $issuedAt = time();
+            $expirationTime = $issuedAt + (60 * 60); // valid for 1 hour
+
+            $payload = [
+                'iat' => $issuedAt,
+                'exp' => $expirationTime,
+                'iss' => 'PFT',
+                'data' => [
+                    'user_id' => $user['user_id'],
+                    'email' => $user['email'],
+                    'username' => $user['username'],
+                    'role' => $user['role']
+                ]
+            ];
+
+            // Generate JWT token
+            $jwt = JWT::encode($payload, $this->jwtSecret, 'HS256');
+
+            return [
+                'success' => true,
+                'message' => 'Temporary login successful',
+                'token'   => $jwt,
+                'user'    => [
+                    'user_id' => $user['user_id'],
+                    'username'=> $user['username'],
+                    'email'   => $user['email'],
+                    'role'    => $user['role']
+                ]
+            ];
+
+        } catch (PDOException $e) {
+            error_log("Login error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'An error occurred during login'
+            ];
+        } catch (Exception $e) {
+            error_log("JWT error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Token generation failed'
+            ];
+        }
+    }
+
+    /**
      * Check if a user is an admin based on JWT token
      * 
      * @param string $jwt The JWT token to verify

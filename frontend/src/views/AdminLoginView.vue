@@ -46,7 +46,7 @@ const handleLogin = async (loginData) => {
       alertType.value = 'success'
 
       if (data.token) {
-        loginStore.setJwt(data.token) // Save token to store and localStorage
+        loginStore.setJwt(data.token, loginData.remember) // Pass remember flag
         if (data.refresh_token) {
           loginStore.setRefreshToken(data.refresh_token) // Save refresh token
         }
