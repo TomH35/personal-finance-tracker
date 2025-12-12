@@ -1216,14 +1216,16 @@ export default {
 
       const imgData = canvas.toDataURL("image/png");
 
+      const padding = 16;
+
       const pdf = new jsPDF({
         orientation: "landscape",
         unit: "px",
-        format: [canvas.width + 16, canvas.height + 16 + 20],
+        format: [canvas.width + padding * 2, canvas.height + padding * 2 + 20],
       });
 
-      pdf.text(`Financial Overview - ${selectedPeriod.value}`, 16, 20);
-      pdf.addImage(imgData, "PNG", 16, 16 + 20, canvas.width, canvas.height);
+      pdf.text(`Financial Overview - ${selectedPeriod.value}`, padding, 20);
+      pdf.addImage(imgData, "PNG", padding, padding + 20, canvas.width, canvas.height);
       pdf.save('chart.pdf');
     }
     
