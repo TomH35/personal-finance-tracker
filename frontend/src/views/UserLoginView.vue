@@ -106,4 +106,30 @@ function startWaitTimer(seconds) {
     }
   }, 1000)
 }
+
+// Actual login request
+async function sendLoginRequest(payload) {
+  const response = await fetch('/backend/api/auth-api/user-login-api.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await response.json()
+
+  if (data.success) {
+    loginStore.setJwt(data.token)
+    if (data.refresh_token) {
+      loginStore.setRefreshToken(data.refresh_token)
+    }
+    router.push('/user-dashboard')
+  } else {
+    alertMessage.value = data.message
+    alertType.value = 'error'
+    if (data.captcha_required) {
+      captchaVisible.value = true
+      captchaPassed.value = false
+      waitTimer.value = 0
+    }
+  }
+}
 </script>
