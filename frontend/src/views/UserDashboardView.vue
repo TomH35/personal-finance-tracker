@@ -50,12 +50,12 @@
                 <div 
                   v-for="cat in categories" 
                   :key="cat.id" 
-                  class="mb-2 p-3 rounded d-flex justify-content-between align-items-start" 
+                  class="mb-2 p-3 rounded d-flex justify-content-between align-items-start gap-2" 
                   style="background-color: #f8f9fa; border-left: 3px solid #1D2A5B;"
                 >
-                  <div class="d-flex flex-column">
-                    <span class="fw-medium text-dark mb-2">{{ cat.name }}</span>
-                    <div v-if="!cat.is_predefined" class="d-flex gap-2">
+                  <div class="d-flex flex-column flex-shrink-1 min-w-0" style="flex: 1;">
+                    <span class="fw-medium text-dark mb-2 text-break">{{ cat.name }}</span>
+                    <div v-if="!cat.is_predefined" class="d-flex flex-wrap gap-2">
                       <button 
                         class="btn btn-sm d-flex align-items-center gap-1 px-2 py-1" 
                         style="border: 1px solid #1D2A5B; color: #1D2A5B; background: white; font-size: 0.75rem;" 
@@ -84,7 +84,7 @@
                       Default category
                     </div>
                   </div>
-                  <span class="badge" :class="cat.type === 'income' ? 'bg-success' : 'bg-danger'" style="font-size: 0.7rem;">
+                  <span class="badge flex-shrink-0 align-self-start" :class="cat.type === 'income' ? 'bg-success' : 'bg-danger'" style="font-size: 0.7rem;">
                     {{ cat.type }}
                   </span>
                 </div>
@@ -136,24 +136,34 @@
                 </div>
               </div>
             </div>
-            <div style="overflow: hidden; position: relative;">
+            <div class="tips-carousel-wrapper">
               <div 
-                style="display: flex; transition: transform 0.5s ease-in-out;"
-                :style="{ transform: `translateX(-${currentTipIndex * (tips.length === 1 ? 100 : 50)}%)` }"
+                class="tips-carousel-track"
+                :style="tipsTrackStyle"
               >
                 <div 
                   v-for="(tip, index) in tips" 
                   :key="tip.id"
-                  :style="{ minWidth: tips.length === 1 ? '100%' : '50%', padding: '0 0.5rem' }"
+                  :style="{ minWidth: tips.length <= 1 ? '100%' : `${(100 / tipsPerView)}%`, padding: '0 0.5rem' }"
                 >
-                  <div class="card border-0 shadow-sm text-white" :style="tipCardStyle(index)" style="height: 180px;">
+                  <div class="card border-0 shadow-sm text-white" :style="tipCardStyle(index)">
                     <div class="card-body d-flex flex-column p-3">
                       <div class="d-flex justify-content-between align-items-center mb-2 opacity-75 small">
                         <span>Tip {{ index + 1 }}</span>
                         <i class="bi bi-lightning-charge-fill"></i>
                       </div>
                       <h6 class="fw-bold mb-2">{{ tip.title }}</h6>
-                      <p class="flex-grow-1 mb-2 small" style="overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;">{{ tip.content }}</p>
+                      <p class="flex-grow-1 mb-2 small tip-message">
+                        {{ tipPreviewText(tip.content, tip.id) }}
+                        <button 
+                          v-if="shouldShowReadMore(tip.content)"
+                          type="button"
+                          class="btn btn-link btn-sm p-0 ms-1 tip-read-more-btn"
+                          @click="toggleTipExpansion(tip.id)"
+                        >
+                          {{ isTipExpanded(tip.id) ? 'Show less' : 'Read more' }}
+                        </button>
+                      </p>
                       <div class="d-flex justify-content-between align-items-center small opacity-75">
                         <span style="font-size: 0.75rem;">{{ tip.created_at ? new Date(tip.created_at).toLocaleDateString() : 'Just added' }}</span>
                         <span class="fw-semibold" style="font-size: 0.75rem;">Stay inspired</span>
@@ -163,14 +173,14 @@
                 </div>
               </div>
             </div>
-            <div class="text-center mt-3" v-if="tips.length > 2">
+            <div class="text-center mt-3" v-if="tips.length > tipsPerView">
               <div class="d-inline-flex gap-2">
                 <button 
-                  v-for="i in Math.ceil(tips.length / 2)" 
+                  v-for="i in tipPaginationCount" 
                   :key="i"
-                  @click="currentTipIndex = (i - 1) * 2"
+                  @click="goToTipPage(i)"
                   class="btn btn-sm rounded-circle"
-                  :class="currentTipIndex >= (i - 1) * 2 && currentTipIndex < i * 2 ? 'btn-primary' : 'btn-outline-secondary'"
+                  :class="currentTipIndex >= (i - 1) * tipsPerView && currentTipIndex < i * tipsPerView ? 'btn-primary' : 'btn-outline-secondary'"
                   style="width: 10px; height: 10px; padding: 0; border-width: 2px;"
                 ></button>
               </div>
@@ -180,9 +190,9 @@
           <!-- Financial Overview Chart -->
           <div class="card border shadow-sm mb-4">
             <div class="card-body p-4">
-              <div class="d-flex justify-content-between align-items-center mb-4">
+              <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
                 <h5 class="fw-bold mb-0" style="color: #1D2A5B;">Financial Overview</h5>
-                <select v-model="selectedChartType" class="form-select form-select-sm" style="width: auto;">
+                <select v-model="selectedChartType" class="form-select form-select-sm">
                   <option value="monthly-comparison">Monthly Income vs Expenses</option>
                   <option value="expense-breakdown">Expense Breakdown by Category</option>
                   <option value="income-breakdown">Income Breakdown by Category</option>
@@ -237,7 +247,7 @@
                 <Doughnut v-else-if="selectedChartType === 'income-breakdown'" :data="incomeBreakdownData" :options="doughnutChartOptions" />
                 <Line v-else-if="selectedChartType === 'balance-trend'" :data="balanceTrendData" :options="lineChartOptions" />
               </div>
-              <div class="d-flex align-items-center">
+              <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-3">
                 <div class="btn-group btn-group-sm" role="group" aria-label="Period selector">
                   <button 
                     type="button" 
@@ -270,7 +280,8 @@
                 </div>
                 <button
                   type="button" 
-                  class="btn btn-primary ms-auto" 
+                  class="btn ms-md-auto" 
+                  style="background-color: #1D2A5B; color: white; border: none;"
                   @click="generatePDF"
                   title="Save the chart as PDF"
                   >Save as PDF</button>
@@ -415,8 +426,11 @@
                       <th class="text-end text-muted fw-semibold small text-uppercase">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    <tr v-for="transaction in filteredAndSortedTransactions" :key="transaction.id">
+                  <tbody v-for="group in groupedTransactions" :key="group.label">
+                    <tr class="table-light">
+                      <td colspan="6" class="transaction-group-label text-uppercase small fw-semibold">{{ group.label }}</td>
+                    </tr>
+                    <tr v-for="transaction in group.transactions" :key="`${group.label}-${transaction.id}`">
                       <td>
                         <span class="badge" :class="transaction.type === 'income' ? 'bg-success' : 'bg-danger'">
                           {{ transaction.type === 'income' ? 'Income' : 'Expense' }}
@@ -679,7 +693,7 @@
 <script>
 import { useLoginStore } from '@/stores/loginStore'
 import { useNotificationStore } from '@/stores/notificationStore'
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { authenticatedFetch } from '@/utils/api'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
@@ -804,6 +818,15 @@ export default {
       initializeCustomDates()
     })
 
+    onMounted(() => {
+      handleTipsResize()
+      window.addEventListener('resize', handleTipsResize)
+    })
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('resize', handleTipsResize)
+    })
+
     // Chart type selector
     const selectedChartType = ref('monthly-comparison')
 
@@ -813,6 +836,12 @@ export default {
     // Category filter for expense breakdown chart
     const selectedExpenseCategories = ref([])
     const currentTipIndex = ref(0)
+    const expandedTips = ref(new Set())
+    const isTipsSingleColumn = ref(false)
+
+    const handleTipsResize = () => {
+      isTipsSingleColumn.value = window.innerWidth < 768
+    }
     
     const tipGradientPalette = [
       'linear-gradient(135deg, #1D2A5B, #3D64A8)',
@@ -821,24 +850,81 @@ export default {
       'linear-gradient(135deg, #FF6A3A, #FF4F81)',
       'linear-gradient(135deg, #FFB347, #FFCC33)'
     ]
+
+    const READ_MORE_CHAR_LIMIT = 180
+
+    const tipsPerView = computed(() => {
+      if (tips.value.length <= 1) {
+        return 1
+      }
+      return isTipsSingleColumn.value ? 1 : 2
+    })
+
+    const tipWidthPercent = computed(() => 100 / tipsPerView.value)
+
+    const tipPaginationCount = computed(() => {
+      if (tips.value.length === 0) return 1
+      return Math.ceil(tips.value.length / tipsPerView.value)
+    })
+
+    const tipsTrackStyle = computed(() => ({
+      display: 'flex',
+      transition: 'transform 0.5s ease-in-out',
+      transform: tips.value.length > tipsPerView.value
+        ? `translateX(-${currentTipIndex.value * tipWidthPercent.value}%)`
+        : 'translateX(0)'
+    }))
+
+    const isTipExpanded = (id) => expandedTips.value.has(id)
+
+    const toggleTipExpansion = (id) => {
+      const updated = new Set(expandedTips.value)
+      if (updated.has(id)) {
+        updated.delete(id)
+      } else {
+        updated.add(id)
+      }
+      expandedTips.value = updated
+    }
+
+    const tipPreviewText = (content, id) => {
+      if (!content) return ''
+      if (isTipExpanded(id)) return content
+      return content.length > READ_MORE_CHAR_LIMIT
+        ? content.slice(0, READ_MORE_CHAR_LIMIT).trim() + '…'
+        : content
+    }
+
+    const shouldShowReadMore = (content) => {
+      return content && content.length > READ_MORE_CHAR_LIMIT
+    }
     
     const prevTip = () => {
-      if (currentTipIndex.value > 0) {
-        currentTipIndex.value -= 2
+      const step = tipsPerView.value
+      if (currentTipIndex.value === 0) {
+        const remainder = tips.value.length % step
+        const lastIndex = remainder === 0 ? tips.value.length - step : tips.value.length - remainder
+        currentTipIndex.value = Math.max(0, lastIndex)
       } else {
-        // Loop to end
-        const maxIndex = Math.max(0, tips.value.length - 2)
-        currentTipIndex.value = Math.floor(maxIndex / 2) * 2
+        currentTipIndex.value = Math.max(0, currentTipIndex.value - step)
       }
     }
     
     const nextTip = () => {
-      if (currentTipIndex.value + 2 < tips.value.length) {
-        currentTipIndex.value += 2
-      } else {
-        // Loop to start
+      const step = tipsPerView.value
+      const maxStartIndex = Math.max(0, tips.value.length - step)
+      if (currentTipIndex.value >= maxStartIndex) {
         currentTipIndex.value = 0
+      } else {
+        currentTipIndex.value = Math.min(maxStartIndex, currentTipIndex.value + step)
       }
+    }
+
+    const goToTipPage = (pageIndex) => {
+      const step = tipsPerView.value
+      const target = (pageIndex - 1) * step
+      const maxStartIndex = Math.max(0, tips.value.length - step)
+      currentTipIndex.value = Math.min(target, maxStartIndex)
     }
     
     // Get unique expense category names from transactions
@@ -857,6 +943,17 @@ export default {
         selectedExpenseCategories.value = [...newOptions]
       }
     }, { immediate: true })
+
+    watch([
+      () => tips.value.length,
+      tipsPerView
+    ], () => {
+      const step = tipsPerView.value
+      const maxStartIndex = Math.max(0, tips.value.length - step)
+      if (currentTipIndex.value > maxStartIndex) {
+        currentTipIndex.value = maxStartIndex
+      }
+    })
     
     // Toggle individual category
     function toggleExpenseCategory(category) {
@@ -880,7 +977,8 @@ export default {
 
     const tipCardStyle = (index) => ({
       background: tipGradientPalette[index % tipGradientPalette.length],
-      color: '#fff'
+      color: '#fff',
+      minHeight: '180px'
     })
 
     // Returns a local date key in the form "YYYY-MM-DD"
@@ -907,6 +1005,14 @@ export default {
         return new Date(y, m - 1, d) // local midnight
       }
       return new Date(s)
+    }
+
+    const formatMonthYearLabel = (dateString) => {
+      const date = parseDate(dateString)
+      if (!date || Number.isNaN(date.getTime())) {
+        return 'Unknown'
+      }
+      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     }
 
     const getPeriodStartDate = (period) => {
@@ -1454,6 +1560,20 @@ export default {
       return filtered
     })
 
+    const groupedTransactions = computed(() => {
+      const groups = []
+      let currentGroup = null
+      filteredAndSortedTransactions.value.forEach(transaction => {
+        const label = formatMonthYearLabel(transaction.date)
+        if (!currentGroup || currentGroup.label !== label) {
+          currentGroup = { label, transactions: [] }
+          groups.push(currentGroup)
+        }
+        currentGroup.transactions.push(transaction)
+      })
+      return groups
+    })
+
    
     async function loadAllTransactions() {
       loading.value = true
@@ -1998,6 +2118,7 @@ export default {
       filteredCategories,
       editFilteredCategories,
       filteredAndSortedTransactions,
+      groupedTransactions,
       summaryTimeWindow,
       summaryStartDate,
       summaryEndDate,
@@ -2050,8 +2171,42 @@ export default {
       currentTipIndex,
       prevTip,
       nextTip,
-      tipCardStyle
+      tipCardStyle,
+      tipsTrackStyle,
+      tipsPerView,
+      tipPaginationCount,
+      tipPreviewText,
+      toggleTipExpansion,
+      shouldShowReadMore,
+      isTipExpanded,
+      goToTipPage
     }
   }
 }
 </script>
+
+<style scoped>
+.tips-carousel-wrapper {
+  overflow: hidden;
+  position: relative;
+}
+
+.tip-message {
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.4;
+}
+
+.tip-read-more-btn {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: underline;
+}
+
+.tip-read-more-btn:hover {
+  color: #ffffff;
+}
+
+.transaction-group-label {
+  color: #1D2A5B;
+}
+</style>

@@ -613,4 +613,11 @@ onUnmounted(() => {
     min-width: 260px;
   }
 }
+
+@media (max-width: 340px) {
+  .profile-dropdown {
+    right: auto;
+    transform: translateX(-70%);
+  }
+}
 </style>
