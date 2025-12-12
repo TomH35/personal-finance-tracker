@@ -117,9 +117,9 @@ async function sendLoginRequest(payload) {
   const data = await response.json()
 
   if (data.success) {
-    loginStore.setJwt(data.token)
+    loginStore.setJwt(data.token, tempLoginData.remember)
     if (data.refresh_token) {
-      loginStore.setJwt(data.token, tempLoginData.remember)
+      loginStore.setRefreshToken(data.refresh_token)
     }
     router.push('/user-dashboard')
   } else {
