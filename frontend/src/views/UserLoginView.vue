@@ -119,7 +119,7 @@ async function sendLoginRequest(payload) {
   if (data.success) {
     loginStore.setJwt(data.token)
     if (data.refresh_token) {
-      loginStore.setRefreshToken(data.refresh_token)
+      loginStore.setJwt(data.token, tempLoginData.remember)
     }
     router.push('/user-dashboard')
   } else {
